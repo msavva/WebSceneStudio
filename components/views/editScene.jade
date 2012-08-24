@@ -1,0 +1,26 @@
+doctype 5
+html
+  head
+    title= title
+    link(rel='stylesheet', href='/stylesheets/editScene.css')
+    link(rel='stylesheet', href='/javascripts/jquery-ui/css/redmond/jquery-ui-1.8.21.custom.css')
+  body
+    #ui
+      #toolbar
+      #graphicsArea
+        canvas#canvas(oncontextmenu="return false;", tabindex="-1",
+                      onclick="$('#canvas').focus();")
+      #searchArea
+        h3#searchInputHeader Model Search
+        input(type="text", id="searchInputBox")
+        button#searchButton Search
+        #searchResults.panel
+          #searchResultsContents
+  include glsl/model.vert.jade
+  include glsl/model.frag.jade
+  include glsl/constant.vert.jade
+  include glsl/constant.frag.jade
+  include glsl/picking.vert.jade
+  include glsl/picking.frag.jade
+  
+  script(data-main="/javascripts/main", src="/javascripts/require.js")

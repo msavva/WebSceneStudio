@@ -1,0 +1,10 @@
+script(id="constant.frag", type="text/x-fragment").
+    #ifdef GL_ES
+    precision mediump float;
+    #endif
+    
+    uniform vec4 u_color;
+    
+    void main(void) {
+        gl_FragData[0] = u_color;
+    }

@@ -1,0 +1,24 @@
+body {
+  font: 18px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+a {
+  color: #00b7ff;
+}
+#page_contents {
+  padding: 50px;
+}
+#menubar_background {
+  width: 100%;
+}
+#menubar_left {
+  float: left;
+}
+#menubar_right {
+  float: right;
+}
+#float_clear {
+  clear: both;
+}
+input {
+  font: 18px "Lucida Grande", Helvetica, Arial, sans-serif;
+}

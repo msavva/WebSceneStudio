@@ -1,0 +1,331 @@
+body
+{
+    margin: 0;
+    overflow: hidden;
+    font-family: Helvetica;
+    font-family: sans-serif;
+}
+
+#ui
+{
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#ui.busy *
+{
+    cursor: wait;
+}
+
+#ui.hideCursor *
+{
+    cursor: none;
+}
+
+#splitView
+{
+    width: 100%;
+    position: absolute;
+    top: 0px;
+    bottom: 0;
+    left: 0;
+}
+
+#graphicsArea
+{
+    background: -moz-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -webkit-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -ms-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -o-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    height: 100%;
+    
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin-right: 0px;
+}
+
+#canvas
+{
+    height: 100%;
+    width: 100%;
+}
+#canvas:focus
+{
+    outline: none;
+}
+
+#searchArea
+{
+    height: 100%;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 350px;
+    
+    border-left: thin solid #A5A5A5;
+    
+    background: -moz-linear-gradient(top, rgba(207,231,250,0.75) 0%,rgba(99,147,193,0.75) 100%);
+    background: -webkit-linear-gradient(top, rgba(207,231,250,0.75) 0%,rgba(99,147,193,0.75) 100%);
+    background: -ms-linear-gradient(top, rgba(207,231,250,0.75) 0%,rgba(99,147,193,0.75) 100%);
+    background: -o-linear-gradient(top, rgba(207,231,250,0.75) 0%,rgba(99,147,193,0.75) 100%);
+    background: linear-gradient(top, rgba(207,231,250,0.75) 0%,rgba(99,147,193,0.75) 100%);
+}
+
+#searchArea h3
+{
+    margin-bottom: 4px;
+    margin-top: 4px;
+    margin-left: 12px;
+    margin_right: 12px;
+}
+
+#searchInputHeader
+{
+    position: absolute;
+    top: 8px;
+}
+
+#searchInputBox
+{
+    font-size: 12pt;
+    position: absolute;
+    top: 34px;
+    left: 0;
+    right: 0;
+    margin: 10px;
+    padding: 6px;
+    border: thin solid #A5A5A5;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+    border-radius: 8px;
+    background: white;
+}
+#searchInputBox:focus
+{
+    outline: none;
+    border: medium solid #EF9F56;
+}
+
+#searchButton
+{
+    position: absolute;
+    top: 82px;
+    right: 0px;
+    margin-right: 12px;
+}
+
+#searchResults
+{
+    position: absolute;
+    top: 130px;
+    bottom: 0;
+}
+
+#searchResultsContents
+{
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    /*
+    margin-left: 6px;
+    margin-right: 6px;
+    */
+    margin: 10px;
+    overflow-y: scroll;
+}
+
+#searchResultsContents .busyWaitIcon
+{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 20px;
+}
+
+.panel
+{
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin: 10px;
+    border: thin solid #A5A5A5;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+    border-radius: 8px;
+    background: #E3EBF1;
+}
+
+.searchResultContainer
+{
+    float: left;
+    width: 250px;
+    padding: 8px;
+    margin-bottom: 8px;
+    
+    border: medium solid #3F6993;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    -ms-border-radius: 8px;
+    -o-border-radius: 8px;
+    border-radius: 8px;
+    
+    background: rgb(79,133,187);
+}
+
+.searchResultContainer.selected
+{
+    background: #EF9F56;
+    border-color: #e17009;
+}
+
+.searchResultContainer img
+{
+    display: block;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 4px;
+    
+    border: thin solid black;
+}
+
+.searchResultContainer span
+{
+    color: white;
+    font-weight: bold;
+    font-size: 11pt;
+}
+
+.tooltip
+{
+    color: black;
+    font-size: 9pt;
+    font-family: sans-serif;
+    
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    
+    background: rgba(221,238,255,1);
+    border: 1px solid #A5A5A5;
+    
+    -moz-box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+    -webkit-box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+    -ms-box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+    -o-box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+    box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+    
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    -ms-border-radius: 3px;
+    -o-border-radius: 3px;
+    border-radius: 3px;
+}
+
+#toolbar
+{
+    position: absolute;
+    right: 350px;
+    top: 20px;
+    z-index: 2;
+    margin-right: 30px;
+}
+
+#toolbar .button
+{
+    display: inline-block;
+    
+    padding: 6px;
+    
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -o-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    
+    border: 1px solid rgba(0, 0, 0, 0);
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    -ms-border-radius: 3px;
+    -o-border-radius: 3px;
+    border-radius: 3px;
+    
+    margin-left: 8px;
+    
+    background-color: rgba(255, 255, 255, 0.3);
+    background-repeat: no-repeat;
+    background-position: center 2px;
+    
+    color: #333;
+    font-size: 9pt;
+    
+    position: relative;
+    
+    height: 34px;
+    width: 40px;
+    
+    cursor: default;
+}
+#toolbar .button:hover
+{
+    background-color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+#toolbar .button:active
+{
+    background-color: rgba(0, 0, 0, 1.0);
+    color: white;
+}
+#toolbar .button.disabled
+{
+    opacity: 0.3;
+}
+
+#toolbar .buttonLabel
+{
+    position: absolute;
+    text-align: center;
+    left: 0;
+    right: 0;
+    bottom: 2px;
+}
+
+#toolbar .spacer
+{
+    width: 30px;
+    display: inline-block;
+    visibility: hidden;
+}
+
+
+#archGenDialog
+{
+    background: -moz-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -webkit-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -ms-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: -o-linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+    background: linear-gradient(top, rgba(249,249,249,1) 0%,rgba(221,238,255,1) 100%);
+}
+
+#archGenCanvas
+{
+    height: 99%;
+    width: 99%;
+}
+#archGenCanvas:focus
+{
+    outline: none;
+}

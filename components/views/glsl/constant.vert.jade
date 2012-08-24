@@ -1,0 +1,17 @@
+script(id="constant.vert", type="text/x-vertex").
+    #ifdef GL_ES
+    precision highp float;
+    #endif
+    
+    uniform mat4 u_mvp;
+    attribute vec3 a_position;
+    attribute vec3 a_normal;    // Why does the shader break if we don't
+                                // have/use a_normal
+    
+    varying vec3 v_normal;
+    
+    void main(void)
+    {
+        v_normal = a_normal;
+        gl_Position = u_mvp * vec4(a_position, 1.0);
+    }

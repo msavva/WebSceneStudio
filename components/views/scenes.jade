@@ -1,0 +1,36 @@
+extends layout
+
+block content
+    include menubar
+    h1= title
+    h3 Scene List
+    #scene_list
+        -for (var id in scenes)
+            -var scene = scenes[id]
+            form(method='get', action='/scenes/#{scene.name}/edit')
+                | #{scene.name} 
+                button edit
+    button#new_scene New Scene
+
+block scripts
+  script
+    $(function() {
+      $('button').button();
+      $('#new_scene').click(function(){
+        var dialog = $('<div id="new_scene_dialog">\
+          <form method="post" action="/newScene" id="new_scene_form">\
+            Scene Name: <input type="text" name="scene_name">\
+          </form>\
+        </div>');
+        dialog.dialog({
+          modal: true,
+          title: "Create New Scene",
+          buttons: [
+            {text: "Cancel", click: function() {$(this).dialog("close")}},
+            {text: "Submit", click: function() {
+                $('#new_scene_form').submit();
+            }},
+          ],
+        });
+      });
+    });

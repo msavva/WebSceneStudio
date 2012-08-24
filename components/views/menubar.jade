@@ -1,0 +1,13 @@
+
+#menubar_background
+    #menubar_left
+        a(href='/') Scene Studio (logo)
+    #menubar_right
+        a(href='/scenes') Scenes
+        |  | 
+        if username == ''
+            a(href='/') Login
+        else
+            | #{username} 
+            a(href='/logout') Logout
+    #float_clear

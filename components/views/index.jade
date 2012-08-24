@@ -1,0 +1,11 @@
+extends layout
+
+block content
+    include menubar
+    h1= title
+    p Welcome to #{title}
+    p To get started, let's log in!
+    form(method='post', action='/login')
+        | Username: 
+        input(name='loginName', type='text')
+
