@@ -36,9 +36,8 @@ function Toolbar(app)
 	
 	this.AddSpacer();
 	
-	this.AddButton('New', 'New scene (Ctrl + N)', 'new', function(event) {console.log('Not yet implemented');});
 	this.AddButton('Save', 'Save scene (Ctrl + S)', 'save', function(event) {console.log('Not yet implemented');});
-	this.AddButton('Open', 'Open saved scene (Ctrl + O)', 'open', function(event) {console.log('Not yet implemented');});
+	this.AddButton('Close', 'Close the editor', 'close', function(event) {console.log('Not yet implemented');});
 	
 	// Disable buttons in the intial state
 	this.DisableButton('Undo');
@@ -93,16 +92,13 @@ Toolbar.prototype.AddButton = function(name, tooltip, iconName, callback)
 	var button = $('<div class="button"><\div>');
 	button.attr('title', tooltip);
 	button.append($('<span class="buttonLabel">' + name + '<\span>'));
-	button.css('background-image', 'url('+Constants.resourceDir+
-	                               'toolbar_icons/'+iconName+'_normal.png)');
+	button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_normal.png)');
 	
 	// Change the icon color when the button is active
 	button.mousedown(function(event) {
-		button.css('background-image', 'url('+Constants.resourceDir+
-	                               'toolbar_icons/'+iconName+'_active.png)');
+		button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_active.png)');
 		var mouseup = function(event) {
-			button.css('background-image', 'url('+Constants.resourceDir+
-	                               '/toolbar_icons/'+iconName+'_normal.png)');
+			button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_normal.png)');
 			$(document).unbind('mouseup', mouseup);
 		};
 		$(document).mouseup(mouseup);	

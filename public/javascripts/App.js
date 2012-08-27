@@ -347,6 +347,10 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 				if (instanceToModify && saveUndo)
 					this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SWITCHFACE, instanceToModify);
                 break;
+            case 88:
+                if (instanceToModify)
+                    console.log(instanceToModify.model.id);
+                break;
             default:
 				handled = false;
                 break;
@@ -465,9 +469,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 	
 	App.prototype.Tumble = function(mInst, doRecordUndoEvent)
 	{
-		mInst.cubeFace = (mInst.cubeFace + 1) % 6;
-		mInst.Publish('Tumbled');
-		mInst.UpdateTransformCascading();
+		mInst.Tumble();
 		doRecordUndoEvent && this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SWITCHFACE, mInst);
 		this.renderer.postRedisplay();	
 	}

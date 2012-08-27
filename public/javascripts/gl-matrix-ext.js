@@ -2,6 +2,33 @@
 
 'use strict';
 
+vec3.sphericalCoords = function(src, dst)
+{
+	// r
+	dst[0] = vec3.length(src);
+	// theta
+	dst[1] = Math.acos(src[2] / dst[0]);
+	// phi
+	dst[2] = Math.atan2(src[1], src[0]);
+}
+
+mat4.createFromRows = function(v0, v1, v2, v3)
+{
+	var args = [];
+	args.concat(v0);
+	args.concat(v1);
+	args.concat(v2);
+	args.concat(v3);
+	return mat4.createFrom.apply(this, args);
+}
+
+mat4.createFromColumns = function(v0, v1, v2, v3)
+{
+	var m = mat4.createFromRows(v0, v1, v2, v3);
+	mat4.transpose(m);
+	return m;
+}
+
 /*
  * from and to must be normalized.
  */
@@ -36,13 +63,17 @@ mat4.face = function (from, to, dest)
     var axis = vec3.create();
     vec3.cross(from, to, axis);
 
-    var angle = Math.acos(vec3.dot(from, to));
+	var d = vec3.dot(from, to);
+	// Floating point inaccuracy makes it necessary to clamp d
+	d = Math.min(d, 1.0); d = Math.max(d, -1.0);
+    var angle = Math.acos(d);
 
     if (angle == 0.0)
     {
         mat4.identity(dest);
     }
-    else if (vec3.length(axis) == 0.0)
+    //else if (vec3.length(axis) == 0.0)
+	else if (vec3.length(axis) < 0.00001)
     {
         var basis0 = vec3.create();
         var basis1 = vec3.create();
@@ -51,6 +82,7 @@ mat4.face = function (from, to, dest)
     }
     else
     {
+		vec3.normalize(axis);
         mat4.rotate(dest, angle, axis);
     }
 
