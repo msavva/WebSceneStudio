@@ -40,7 +40,7 @@ Constants.insertingObjectAlpha = 0.75;
 Constants.selectedObjectOutlineColor = new Float32Array([79/255, 133/255, 187/255, 1]);
 
 // Manipulators
-Constants.manipulatorOffset = 0.1;
+Constants.manipExtraZoffset = 0.05;
 Constants.rotateNotchExtraOffset = 0.03;
 Constants.rotateNotchWidth = 4.0 * (Math.PI/180);
 Constants.rotateSnapHalfWidth = 6.0 * (Math.PI/180);

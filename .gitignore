@@ -1,3 +1,10 @@
+<<<<<<< HEAD
 /public/data
 /components/servers/solr/modelsearch/solr/data
 /components/servers/solr/tmp_agg.json
+=======
+
+public/data/*
+components/servers/solr/modelsearch/solr/data/*
+
+>>>>>>> 3adfa4df3b33de669cef028504e82868b1d7f891

@@ -206,6 +206,11 @@ body
     color: white;
     font-weight: bold;
     font-size: 11pt;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    word-wrap: break-word;
+    text-overflow: ellipsis;
 }
 
 .tooltip

@@ -24,7 +24,6 @@ function Manipulator()
 	// Transform stuff
 	this.transform = mat4.identity(mat4.create());
 	this.normalTransform = mat3.identity(mat3.create());
-	this.center = vec3.create();
 	this.ownerInstance = null;
 	
 	// Tooltip
@@ -54,41 +53,26 @@ Manipulator.prototype.Detach = function()
 	this.ownerInstance = null;
 }
 
-Manipulator.prototype.BasicTransform = function(dest)
-{	
+Manipulator.prototype.UpdateTransform = function()
+{
 	if (!this.ownerInstance)
 	{
-		// No point in trying to determine transform if the owner instance
-		// does not exist
 		return;
 	}
-	var mInst = this.ownerInstance;
 	
-	mat4.identity(dest);
-	var anchorPos = mInst.BaseCentroid();
-	vec3.set(anchorPos, this.center);
-	var anchorNormal = mInst.parentNormal;
+	mat4.identity(this.transform);
+	this.ownerInstance.SecondTransform(this.transform, false);
 	
-	// If owner has a parent, rotate about the up vector *by the parent's rotation*
-	if (mInst.parent)
-	{
-		mat4.rotateZ(dest, mInst.parent.rotation);
-	}
+	// Small extra offset along surface normal to prevent z-fighting
+	// with any flat objects that the manipulator overlays
+	var m = mat4.identity(mat4.create());
+	var offset = vec3.create(this.ownerInstance.coordFrame.w);
+	vec3.scale(offset, Constants.manipExtraZoffset);
+    mat4.translate(m, offset);
+    mat4.multiply(m, this.transform, this.transform);
 	
-	// Rotate to face the local up direction
-    var faceNormal = mat4.identity(mat4.create());
-    mat4.face(vec3.createFrom(0.0, 0.0, 1.0), anchorNormal, faceNormal);
-    mat4.multiply(faceNormal, dest, dest);
-	
-	// Translate disc to the surface contact point + a small offset above the surface
-	var transVec = vec3.create(anchorPos);
-	var offset = vec3.create(anchorNormal);
-	vec3.scale(offset, Constants.manipulatorOffset);
-	vec3.add(transVec, offset);
-	var translateMat = mat4.identity(mat4.create());
-	mat4.translate(translateMat, transVec);
-	mat4.multiply(translateMat, dest, dest);
-	
+	// Update normal transform
+	mat4.toRotationMat(this.transform, this.normalTransform);
 }
 
 Manipulator.prototype.CommonDrawSetup = function(renderer)
@@ -186,8 +170,9 @@ Manipulator.prototype.EndMouseInteract = function(data)
 // This is useful for lots of manipulator interactions
 Manipulator.prototype.PickPlane = function(data)
 {
-	var pp = this.center;
-	var pn = this.ownerInstance.parentNormal;
+	var cf = this.ownerInstance.coordFrame;
+	var pp = this.ownerInstance.parentPos;
+	var pn = cf.w;
 	return data.app.renderer.picker.PickPlane(data.x, data.y, pp, pn, data.app.camera, data.app.renderer);
 }
 
@@ -276,26 +261,12 @@ RotationManipulator.prototype.Detach = function()
 	Manipulator.prototype.Detach.call(this);
 }
 
-RotationManipulator.prototype.UpdateTransform = function()
-{
-	if (!this.ownerInstance)
-	{
-		return;
-	}
-	
-	// Use the basic transform utility from Manipulator
-	this.BasicTransform(this.transform);
-	
-	// Update normal transform
-	mat4.toRotationMat(this.transform, this.normalTransform);
-}
-
 RotationManipulator.prototype.BeginMouseInteract = function(data)
 {
 	Manipulator.prototype.BeginMouseInteract.call(this, data);
 	
 	var isect = this.PickPlane(data);
-	vec3.subtract(isect.position, this.center, this.prevVector);
+	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.prevVector);
 	
 	this.actualAbsoluteAng = this.ownerInstance.rotation;
 	this.snappedAbsoluteAng = this.ownerInstance.rotation;
@@ -307,9 +278,11 @@ RotationManipulator.prototype.ContinueMouseInteract = function(data)
 {
 	Manipulator.prototype.ContinueMouseInteract.apply(this, data);
 	
+	var cf = this.ownerInstance.coordFrame;
+	
 	var isect = this.PickPlane(data);
-	vec3.subtract(isect.position, this.center, this.currVector);
-	var ang = vec3.signedAngleBetween(this.prevVector, this.currVector, this.ownerInstance.parentNormal);
+	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.currVector);
+	var ang = vec3.signedAngleBetween(this.prevVector, this.currVector, cf.w);
 	this.actualAbsoluteAng += ang;
 	this.SnapAbsoluteAng();
 	ang = this.AbsoluteAngToRelativeAng(this.snappedAbsoluteAng);
@@ -331,8 +304,7 @@ RotationManipulator.prototype.EndMouseInteract = function(data)
 RotationManipulator.prototype.SnapAbsoluteAng = function()
 {
 	var HALFPI = Math.PI * 0.5;
-	var parRot = (this.ownerInstance.parent ? this.ownerInstance.parent.rotation : 0);
-	var rotmod = (this.actualAbsoluteAng - parRot) % HALFPI;
+	var rotmod = this.actualAbsoluteAng % HALFPI;
 	var hw = Constants.rotateSnapHalfWidth;
 	if (rotmod > 0 && rotmod < hw)
 		this.snappedAbsoluteAng = this.actualAbsoluteAng - rotmod;
@@ -433,26 +405,12 @@ ScaleManipulator.prototype.Detach = function()
 	Manipulator.prototype.Detach.call(this);
 }
 
-ScaleManipulator.prototype.UpdateTransform = function()
-{
-	if (!this.ownerInstance)
-	{
-		return;
-	}
-	
-	// Use the basic transform utility from Manipulator
-	this.BasicTransform(this.transform);
-	
-	// Update normal transform
-	mat4.toRotationMat(this.transform, this.normalTransform);
-}
-
 ScaleManipulator.prototype.BeginMouseInteract = function(data)
 {
 	Manipulator.prototype.BeginMouseInteract.call(this, data);
 	
 	var isect = this.PickPlane(data);
-	vec3.subtract(isect.position, this.center, this.prevVector);
+	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.prevVector);
 	
 	return true;
 }
@@ -462,7 +420,7 @@ ScaleManipulator.prototype.ContinueMouseInteract = function(data)
 	Manipulator.prototype.ContinueMouseInteract.apply(this, data);
 	
 	var isect = this.PickPlane(data);
-	vec3.subtract(isect.position, this.center, this.currVector);
+	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.currVector);
 	
 	var ldiff = vec3.length(this.currVector) / vec3.length(this.prevVector);
 	this.ownerInstance.CascadingScale(ldiff * Constants.scaleMagnitudeMultiplier);

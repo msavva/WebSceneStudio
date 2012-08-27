@@ -66,13 +66,23 @@ function SearchController(app)
 		});
 }
 
+// I originally had this function be anonymous. Then I realized that (assuming no smart
+// optimizations from the javascript engine) it would be created potentially hundreds of
+// times (one for each search result). So now it's named.
+function NoDrag(event)
+{
+	event.preventDefault();
+}
+
+
 SearchController.prototype.CreateSearchResult = function(result)
 {
 	var elem = $('<div></div>')
 				.attr('id', result.id)
 				.addClass('searchResultContainer')
-				.append($('<span>' + result.name + '</span>'))
-				.append($('<img src="' + Constants.imageDir + result.id + '.jpg"></img>'));
+				.append($('<span>' + result.name + '</span>').attr('title', result.name))
+				.append($('<img src="' + Constants.imageDir + result.id + '.jpg"></img>')
+						.bind('dragstart', NoDrag));
 				
 	elem.click(function() { this.ResultSelected(elem.attr('id')); }.bind(this));
 	
@@ -81,12 +91,15 @@ SearchController.prototype.CreateSearchResult = function(result)
 
 SearchController.prototype.ResultSelected = function(mid)
 {
+	var resultElem = $('#'+mid);
+	// Ignore repeated clicks on selected results
+	if (resultElem.hasClass('selected'))
+		return;
+	
 	this.app.ToggleBusy(true);
 	
 	// Cancel any active downloads
 	this.app.assman.CancelDownloads();
-	
-	var resultElem = $('#'+mid);
 	
 	// Make the search results lose focus, so arrow keys used to scale the
 	// inserting model won't also scroll the search results

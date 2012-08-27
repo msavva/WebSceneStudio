@@ -4,11 +4,12 @@ define([
 	'Constants',
 	'PubSub',
 	'UndoStack',
+	'CoordinateFrame',
 	'gl-matrix',
 	'gl-matrix-ext',
     'msgpack'
 ],
-function(Constants, PubSub, UndoStack){
+function(Constants, PubSub, UndoStack, CoordinateFrame){
 
 function ModelInstance(model, parentInst)
 {
@@ -30,9 +31,9 @@ function ModelInstance(model, parentInst)
 	this.parentUV = new Float32Array([0, 0]);
 	this.cubeFace = 0;
 	this.scale = 1.0;
-	this.rotation = 0.0;
 	this.parentPos = vec3.create();
-	this.parentNormal = vec3.create();
+	this.coordFrame = new CoordinateFrame();
+	this.rotation = 0.0;
 	this.transform = mat4.identity(mat4.create());
 	this.normalTransform = mat4.identity(mat4.create());
 	
@@ -43,13 +44,6 @@ function ModelInstance(model, parentInst)
 		isSelected: false,
 		isSelectable: true
 	};
-	
-	// Manipulation state
-	this.manipState = {
-		moveX: -1,
-		moveY: -1,
-		isInteracting: false
-	}
 }
 
 // EXTEND PUBSUB: Inherit PubSub prototype
@@ -112,7 +106,8 @@ ModelInstance.Deserialize = function(packedMinst, assman, modelMap)
 	newMinst.parentUV = new Float32Array(unpacked.parentUV);
 	newMinst.cubeFace = unpacked.cubeFace;
 	newMinst.scale = unpacked.scale;
-	newMinst.rotation = unpacked.rotation
+	newMinst.rotation = unpacked.rotation;
+	newMinst.coordFrame.FromCoordinateFrame(unpacked.coordFrame);
 	
 	// Copy over parent index. Actual model will need to be re-instated at a later time
 	// by the logic that has requested deserialization
@@ -130,6 +125,7 @@ ModelInstance.prototype.Clone = function()
 	newMinst.cubeFace = this.cubeFace;
 	newMinst.scale = this.scale;
 	newMinst.rotation = this.rotation;
+	newMinst.coordFrame.FromCoordinateFrame(this.coordFrame);
 	newMinst.UpdateTransform();
 	
 	for (var iChild = 0; iChild < this.children.length; iChild++)
@@ -154,19 +150,19 @@ ModelInstance.prototype.Remove = function()
 	this.SetParent(null);
 };
 
-// TODO: Make this work correctly for objects whose upright orientation
-// is different from their parent.
 ModelInstance.prototype.CascadingRotate = function (rotate)
 {
-    this.rotation += rotate;
-    this.UpdateTransform();
-
-    this.children.forEach(
-		function (mInst)
-		{
-		    mInst.CascadingRotate(rotate);
-		}
-	);
+	this.rotation += rotate;
+	var rotmat = mat4.identity(mat4.create());
+	mat4.rotate(rotmat, rotate, this.coordFrame.w);
+	
+	var helper = function(mInst)
+	{
+		mInst.coordFrame.Transform(rotmat);
+		mInst.children.forEach(helper);
+	}
+	this.children.forEach(helper);
+	this.UpdateTransformCascading();
 };
 
 ModelInstance.prototype.CascadingScale = function (scale)
@@ -183,6 +179,13 @@ ModelInstance.prototype.CascadingScale = function (scale)
 		}
 	);
 };
+
+ModelInstance.prototype.Tumble = function()
+{
+	this.cubeFace = (this.cubeFace + 1) % 6;
+	this.Publish('Tumbled');
+	this.UpdateTransformCascading();
+}
 
 ModelInstance.prototype.SetReasonableScale = function (scene)
 {
@@ -221,12 +224,85 @@ ModelInstance.prototype.SetParent = function(parInst)
 		parInst.children.push(this);
 };
 
+ModelInstance.prototype.AccumRotationTransform = function()
+{
+	var xform = mat4.identity(mat4.create());
+	var rotmat = mat4.create();
+	
+	for (var inst = this; inst != null; inst = inst.parent)
+	{
+		mat4.identity(rotmat);
+		mat4.rotate(rotmat, inst.rotation, inst.coordFrame.w);
+		//mat4.multiply(rotmat, xform, xform);
+		mat4.multiply(xform, rotmat, xform);	// Not sure why this order is correct...
+	}
+	
+	return xform;
+}
+
+ModelInstance.prototype.ResetCoordFrame = function()
+{		
+	// Transform the world frame into the new frame that we are going to use
+	var newFrame = new CoordinateFrame();
+	var r = this.parent.AccumRotationTransform();
+	var ri = mat4.create();
+	mat4.inverse(r, ri);
+	var origNormal = vec3.create();
+	mat4.multiplyVec3(ri, this.coordFrame.w, origNormal);
+	newFrame.Face(origNormal);
+	newFrame.Transform(r);
+	
+	// Find the angle between newFrame.u and this.coordFrame.u. This is the amount of additional rotation
+	// we need to introduce if we want to use newFrame instead of this.coordFrame
+	var ang = vec3.signedAngleBetween(newFrame.u, this.coordFrame.u, this.coordFrame.w);
+	this.CascadingRotate(ang);
+	
+	// Finally, replace the coordinate frame
+	this.coordFrame.FromCoordinateFrame(newFrame);
+}
+
 ModelInstance.prototype.UpdateStateFromRayIntersection = function(isect)
 {
+	var oldParent = this.parent;
+	
 	this.SetParent(isect.inst);
 	this.parentMeshI = isect.geoID;
 	this.parentTriI = isect.triI;
 	this.parentUV = isect.uv;
+	
+	/** Update coordinate frame **/
+	
+	// If we are in the middle of a move operation, we enforce that
+	// for all support surfaces with the same normal as the support surface
+	// at the beginning of the move, we use the same coordinate frame that
+	// we had at the beginning of the move. This prevents the object from
+	// ending up unexpectedly rotated if it is quickly dragged across surfaces of
+	// different orientation.
+	this.moveState && vec3.normalize(isect.normal);
+	var equivalentToOrignal = this.moveState && vec3.dot(isect.normal, this.moveState.origFrame.w) > 0.999;
+	if (equivalentToOrignal)
+	{
+		this.coordFrame.FromCoordinateFrame(this.moveState.origFrame);
+		this.rotation = this.moveState.origRot;
+	}
+	else
+	{
+		this.coordFrame.Face(isect.normal);
+	}	
+	
+	// If we moved to a different parent object, we need to reset the
+	// coordinate frame accordingly
+	if (oldParent !== this.parent)
+	{
+		this.ResetCoordFrame();
+		// And, if we're in the middle of a move, we may need to update the origFrame
+		if (equivalentToOrignal)
+		{
+			this.moveState.origFrame.FromCoordinateFrame(this.coordFrame);
+			this.moveState.origRot = this.rotation;
+		}
+	}
+	
 	this.UpdateTransformCascading();
 	this.Publish('Moved');
 };
@@ -278,7 +354,7 @@ ModelInstance.prototype.UpdateTransform = function ()
     mat4.toRotationMat(this.transform, this.normalTransform);
 };
 
-// Make the object upright and sitting at the origin
+// Make the object upright and sitting at the origin at the correct size
 ModelInstance.prototype.FirstTransform = function(xform)
 {	
 	// Translate centroid to origin
@@ -300,44 +376,47 @@ ModelInstance.prototype.FirstTransform = function(xform)
     var d = this.model.bbox.Dimensions();
     d[0] *= axis[0] * 0.5; d[1] *= axis[1] * 0.5; d[2] *= axis[2] * 0.5;
 
-    var translateToCenterMatrix = mat4.identity(mat4.create());
-    mat4.translate(translateToCenterMatrix, d);
-    mat4.multiply(translateToCenterMatrix, xform, xform);
+    var m = mat4.identity(mat4.create());
+    mat4.translate(m, d);
+    mat4.multiply(m, xform, xform);
 
-    var faceZ = mat4.identity(mat4.create());
-    mat4.face(axis, vec3.createFrom(0.0, 0.0, 1.0), faceZ);
-    mat4.multiply(faceZ, xform, xform);
+    mat4.identity(m);
+    mat4.face(axis, vec3.createFrom(0.0, 0.0, 1.0), m);
+    mat4.multiply(m, xform, xform);
 	
 	// Scale
-    var scaleMatrix = mat4.identity(mat4.create());
-    mat4.scale(scaleMatrix, vec3.createFrom(this.scale, this.scale, this.scale));
-    mat4.multiply(scaleMatrix, xform, xform);
+    mat4.identity(m);
+    mat4.scale(m, vec3.createFrom(this.scale, this.scale, this.scale));
+    mat4.multiply(m, xform, xform);
 };
 
-// Scale, orient, rotate, and place the object in its final configuration
-ModelInstance.prototype.SecondTransform = function(xform)
+// Orient, rotate, and place the object in its final configuration
+ModelInstance.prototype.SecondTransform = function(xform, opt_doLocalRotation)
 {
-	// rotate about the up vector
-    var zRotateMatrix = mat4.identity(mat4.create());
-    mat4.rotateZ(zRotateMatrix, this.rotation);
-    mat4.multiply(zRotateMatrix, xform, xform);
-
-    var anchorInfo = this.parent.EvaluateSurface(this.parentMeshI, this.parentTriI, this.parentUV);
-    this.parentPos = anchorInfo.position;
-    this.parentNormal = anchorInfo.normal;
-
-    // Align z with parent normal
-    var faceNormal = mat4.identity(mat4.create());
-    mat4.face(vec3.createFrom(0.0, 0.0, 1.0), anchorInfo.normal, faceNormal);
-    mat4.multiply(faceNormal, xform, xform);
+	var doLocalRot = opt_doLocalRotation === undefined ? true : opt_doLocalRotation;
+	
+	var anchorInfo = this.parent.EvaluateSurface(this.parentMeshI, this.parentTriI, this.parentUV);
+	vec3.set(anchorInfo.position, this.parentPos);
+	
+	if (doLocalRot)
+	{
+		// Rotation relative to coordinate frame
+		var m = mat4.identity(mat4.create());
+		mat4.rotateZ(m, this.rotation);
+		mat4.multiply(m, xform, xform);
+	}
+	
+    // Coordinate frame transform
+	m = this.coordFrame.ToBasisMatrix();
+	mat4.multiply(m, xform, xform);
 
     // Translate to anchor position (+ small z offset to avoid coplanarity)
-	var offset = vec3.create(anchorInfo.normal);
+	mat4.identity(m);
+	var offset = vec3.create(this.coordFrame.w);
 	vec3.scale(offset, Constants.transformZoffset);
-	vec3.add(offset, anchorInfo.position);
-    var translateToAnchor = mat4.identity(mat4.create());
-    mat4.translate(translateToAnchor, offset);
-    mat4.multiply(translateToAnchor, xform, xform);
+	vec3.add(offset, this.parentPos);
+    mat4.translate(m, offset);
+    mat4.multiply(m, xform, xform);
 };
 
 ModelInstance.prototype.CommonDrawSetup = function(renderer)
@@ -395,6 +474,9 @@ ModelInstance.prototype.EvaluateSurface = function(meshI, triI, uv)
 	return result;
 };
 
+
+
+
 ModelInstance.prototype.GainFocus = function(data)
 {
 	return false;
@@ -429,9 +511,15 @@ ModelInstance.prototype.BeginMouseInteract = function(data)
 	// picking a location for the object.
 	var bc = this.BaseCentroid();
 	var projc = app.renderer.ProjectVector(bc);
-	this.manipState.moveX = projc[0];
-	this.manipState.moveY = projc[1];
-	this.manipState.isInteracting = false;
+
+	this.moveState = {
+		moveX: projc[0],
+		moveY: projc[1],
+		isInteracting: false,
+		origFrame: new CoordinateFrame(),
+		origRot: this.rotation
+	}
+	this.moveState.origFrame.FromCoordinateFrame(this.coordFrame);
 
 	// Hide the cursor while moves are happening
 	$('#ui').addClass('hideCursor');
@@ -447,14 +535,15 @@ ModelInstance.prototype.ContinueMouseInteract = function(data)
 	app.ToggleSuppressPickingOnSelectedInstance(true);
 
 	// Update manipulation state
-	this.manipState.moveX += data.dx;
-	this.manipState.moveY += data.dy;
-	this.manipState.isInteracting = true;
+	this.moveState.moveX += data.dx;
+	this.moveState.moveY += data.dy;
+	this.moveState.isInteracting = true;
 
-	var intersect = app.PickTriangle(this.manipState.moveX,this.manipState.moveY);
+	var intersect = app.PickTriangle(this.moveState.moveX, this.moveState.moveY);
 	if (intersect)
 	{
 		intersect.inst = app.scene.IndexToObject(intersect.modelID);
+		var op = this.parent;
 		this.UpdateStateFromRayIntersection(intersect);
 		app.scene.UpdateModelList();
 	}
@@ -476,8 +565,10 @@ ModelInstance.prototype.EndMouseInteract = function(data)
 
 	// If we actually did a move, then record it
 	// (this will fail to fire when the mouse was simply clicked and released)
-	if (this.manipState.isInteracting)
+	if (this.moveState.isInteracting)
 		app.undoStack.pushCurrentState(UndoStack.CMDTYPE.MOVE, this);
+		
+	delete this.moveState;
 		
 	this.Publish('StoppedMoving');
 		
