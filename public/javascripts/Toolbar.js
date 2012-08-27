@@ -92,13 +92,14 @@ Toolbar.prototype.AddButton = function(name, tooltip, iconName, callback)
 	var button = $('<div class="button"><\div>');
 	button.attr('title', tooltip);
 	button.append($('<span class="buttonLabel">' + name + '<\span>'));
-	button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_normal.png)');
+	var iconURL = Constants.resourceDir + 'toolbar_icons/' + iconName;
+	button.css('background-image', 'url(' + iconURL + '_normal.png)');
 	
 	// Change the icon color when the button is active
 	button.mousedown(function(event) {
-		button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_active.png)');
+		button.css('background-image', 'url(' + iconURL + '_active.png)');
 		var mouseup = function(event) {
-			button.css('background-image', 'url(resources/toolbar_icons/'+iconName+'_normal.png)');
+			button.css('background-image', 'url(' + iconURL + '_normal.png)');
 			$(document).unbind('mouseup', mouseup);
 		};
 		$(document).mouseup(mouseup);	
