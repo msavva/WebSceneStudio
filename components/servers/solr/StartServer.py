@@ -7,7 +7,7 @@ import time
 Globals
 '''
 port = '8983'
-metaDir = '../../data/metadata'
+metaDir = '../../../public/data/metadata'
 solrDir = 'modelsearch'
 
 
