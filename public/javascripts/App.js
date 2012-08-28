@@ -13,10 +13,12 @@ define([
     'UndoStack',
 	'Toolbar',
 	'PubSub',
+	'SplitView',
 	'uimap',
 	'jquery'
 ],
-function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, SearchController, ArchitectureGenerator, Manipulators, UndoStack, Toolbar, PubSub, uimap)
+function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, SearchController,
+		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, PubSub, SplitView, uimap)
 {
 
     function UIState(gl)
@@ -79,6 +81,14 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		this.toolbar = new Toolbar(this);
         this.searchController = new SearchController(this);
         this.architectureGenerator = new ArchitectureGenerator(this);
+		
+		SplitView.MakeSplitView({
+			leftElem: $('#graphicsOverlay'),
+			rightElem: $('#searchArea'),
+			rightMinWidth: Constants.searchAreaMinWidth,
+			rightMaxWidth: Constants.searchAreaMaxWidth,
+			snapToGrid: Constants.searchAreaResizeGrid
+		});
     }
 	
 	// Extend PubSub
@@ -277,16 +287,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
                 break;
             case 89: // Y key
                 if (ctrl) this.BeginUndoRedo('redo');
-                break;
-            case 70: // F key
-                if (shift)
-                {
-                    $('#searchArea').width(350);
-                }
-                else
-                {
-                    $('#searchArea').width(900);
-                }
                 break;
 			default:
 				handled = false;

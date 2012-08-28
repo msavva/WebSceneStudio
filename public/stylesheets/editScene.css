@@ -62,11 +62,11 @@ body
 
 #searchArea
 {
-    height: 100%;
     position: absolute;
     top: 0;
+    bottom: 0;
     right: 0;
-    width: 350px;
+    width: 300px;
     
     border-left: thin solid #A5A5A5;
     
@@ -170,9 +170,10 @@ body
 .searchResultContainer
 {
     float: left;
-    width: 250px;
+    width: 200px;
     padding: 8px;
     margin-bottom: 8px;
+    margin-right: 8px;
     
     border: medium solid #3F6993;
     -moz-border-radius: 8px;
@@ -240,10 +241,20 @@ body
     border-radius: 3px;
 }
 
-#toolbar
+#graphicsOverlay
 {
     position: absolute;
-    right: 350px;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+#toolbar
+{
+    pointer-events: auto;
+    position: absolute;
+    right: 0px;
     top: 20px;
     z-index: 2;
     margin-right: 30px;

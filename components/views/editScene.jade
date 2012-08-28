@@ -6,10 +6,11 @@ html
     link(rel='stylesheet', href='/javascripts/jquery-ui/css/redmond/jquery-ui-1.8.21.custom.css')
   body
     #ui
-      #toolbar
       #graphicsArea
         canvas#canvas(oncontextmenu="return false;", tabindex="-1",
                       onclick="$('#canvas').focus();")
+      #graphicsOverlay
+        #toolbar
       #searchArea
         h3#searchInputHeader Model Search
         input(type="text", id="searchInputBox")

@@ -184,14 +184,18 @@ Renderer.prototype.pickingDrawPass = function()
 	this.picker.CleanupAfterPicking();
 };
 
-Renderer.prototype.resize = function()
+Renderer.prototype.resize = function(event)
 {
+	if (event && event.target !== window) return;
+	
 	this.setViewport_();
 	this.postRedisplay();
 }
 
-Renderer.prototype.resizeEnd = function()
+Renderer.prototype.resizeEnd = function(event)
 {
+	if (event && event.target !== window) return;
+
 	this.resize();
 	var canvas = this.canvas_;
 	this.picker.HandleResize(canvas.clientWidth, canvas.clientHeight);

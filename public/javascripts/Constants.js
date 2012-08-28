@@ -39,6 +39,11 @@ Constants.transformZoffset = 0.1;
 Constants.insertingObjectAlpha = 0.75;
 Constants.selectedObjectOutlineColor = new Float32Array([79/255, 133/255, 187/255, 1]);
 
+// Split view resizability
+Constants.searchAreaMinWidth = 300;
+Constants.searchAreaMaxWidth = 750;
+Constants.searchAreaResizeGrid = 230;
+
 // Manipulators
 Constants.manipExtraZoffset = 0.05;
 Constants.rotateNotchExtraOffset = 0.03;
