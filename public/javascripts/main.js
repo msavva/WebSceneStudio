@@ -9,6 +9,7 @@ requirejs.config({
 		'gl-matrix': 'gl-matrix-min'
 	},
 	shim: {
+		'jquery.debouncedresize' : ['jquery'],
 		'jquery-ui' : ['jquery'],
 		'gl-matrix-ext' : ['gl-matrix'],
 		'loader' : ['base']

@@ -7,7 +7,9 @@ define([
 	'Mesh',
 	'Picker',
 	'gl-matrix',
-	'gl-matrix-ext'
+	'gl-matrix-ext',
+	'jquery',
+	'jquery.debouncedresize'
 ],
 function(Constants, Shader, Program, Mesh, Picker){
 
@@ -42,7 +44,8 @@ function Renderer(canvas, scene) {
   this.maxHeight = 20480;
   this.scaleX = 1.0;
   this.scaleY = 1.0;
-  window.addEventListener('resize', this.resize.bind(this));
+  $(window).on('resize', this.resize.bind(this));
+  $(window).on('debouncedresize', this.resizeEnd.bind(this));
 
   // WebGL
   gl.clearColor(0, 0, 0, 0);
@@ -119,12 +122,11 @@ Renderer.prototype.ProjectVector = function(vector)
 	return vec2.create([v[0], v[1]]);
 }
 
-Renderer.prototype.setViewport_ = function () {
+Renderer.prototype.setViewport_ = function ()
+{
   var canvas = this.canvas_;
-
   var newWidth = Math.round(this.scaleX * canvas.clientWidth);
   var newHeight = Math.round(this.scaleY * canvas.clientHeight);
-
   newWidth = clamp(newWidth, 1, this.maxWidth);
   newHeight = clamp(newHeight, 1, this.maxHeight);
 
@@ -134,8 +136,6 @@ Renderer.prototype.setViewport_ = function () {
 
     this.gl_.viewport(0, 0, newWidth, newHeight);
   }
-  
-  this.picker.HandleResize(newWidth, newHeight);
 }
 
 Renderer.prototype.commonDrawSetup = function() {
@@ -184,9 +184,17 @@ Renderer.prototype.pickingDrawPass = function()
 	this.picker.CleanupAfterPicking();
 };
 
-Renderer.prototype.resize = function() {
-  this.setViewport_();
-  this.postRedisplay();
+Renderer.prototype.resize = function()
+{
+	this.setViewport_();
+	this.postRedisplay();
+}
+
+Renderer.prototype.resizeEnd = function()
+{
+	this.resize();
+	var canvas = this.canvas_;
+	this.picker.HandleResize(canvas.clientWidth, canvas.clientHeight);
 }
 
 Renderer.prototype.postRedisplay = function() {
