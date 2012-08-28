@@ -2,6 +2,19 @@
 
 // TODO: namespace.
 
+function stringToArrayBuffer(string, callback) {
+    var bb = new Blob([string]);
+    var f = new FileReader();
+    f.onload = function(e) {
+        callback(e.target.result);
+    };
+    f.readAsArrayBuffer(bb);
+}
+
+function arrayBufferToString(buf) {
+    return String.fromCharCode.apply(null, new Uint16Array(buf));
+}
+
 function never() {
   return false;
 }
