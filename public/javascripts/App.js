@@ -92,6 +92,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             this.undoStack.clear();
             this.renderer.postRedisplay();
         } .bind(this));
+		this.renderer.resizeEnd();
         this.UpdateView();
     };
 
