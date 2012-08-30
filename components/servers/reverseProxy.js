@@ -13,7 +13,7 @@ var options = {
 		'localhost/solr/': '127.0.0.1:8983/solr/',
         // redict traffic to arch generator
         'localhost/architectureGenerator/': '127.0.0.1:3972/',
-        //// redict requests for data to dovahkiin
+        // redict requests for data to dovahkiin
         //'localhost/data/': 'dovahkiin.stanford.edu/WebSceneStudio/data/',
          // Direct all other traffic to the express application
         'localhost': '127.0.0.1:3000',

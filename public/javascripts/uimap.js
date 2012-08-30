@@ -205,6 +205,8 @@ function installHandlers()
     $(window).focus(function(event) {
         // could try to check for button and modifier state
         // here to ensure it works right
+        // CLEARING modifier state is safer
+        mod_status = mod_proto();
     });
 }
 
