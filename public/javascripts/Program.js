@@ -73,6 +73,7 @@ Program.prototype.vertexAttribPointers = function(vertexFormat) {
     var attrib = vertexFormat[i];
     var loc = this.attribLocs[attrib.name];
     var typeBytes = 4;  // TODO: 4 assumes gl.FLOAT, use params.type
+    if(loc === undefined)   continue;
     this.gl_.vertexAttribPointer(loc, attrib.size, this.gl_.FLOAT,
                                  !!attrib.normalized, typeBytes*attrib.stride,
                                  typeBytes*attrib.offset);
