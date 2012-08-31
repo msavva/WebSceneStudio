@@ -273,6 +273,14 @@ ModelInstance.prototype.AccumRotationTransform = function()
 	return xform;
 }
 
+ModelInstance.prototype.TransformCoordFrameCascading = function(xform)
+{
+	this.coordFrame.Transform(xform);
+	this.children.forEach(function(mInst) {
+		mInst.TransformCoordFrameCascading(xform);
+	});
+}
+
 ModelInstance.prototype.ResetCoordFrame = function()
 {		
 	// Transform the world frame into the new frame that we are going to use
@@ -305,6 +313,11 @@ ModelInstance.prototype.UpdateStateFromRayIntersection = function(isect)
 	
 	/** Update coordinate frame **/
 	
+	// Save old coordinate frame information
+	var prevCoordFrame = new CoordinateFrame();
+	prevCoordFrame.FromCoordinateFrame(this.coordFrame);
+	var prevRot = this.rotation;
+	
 	// If we are in the middle of a move operation, we enforce that
 	// for all support surfaces with the same normal as the support surface
 	// at the beginning of the move, we use the same coordinate frame that
@@ -335,6 +348,15 @@ ModelInstance.prototype.UpdateStateFromRayIntersection = function(isect)
 			this.moveState.origRot = this.rotation;
 		}
 	}
+	
+	// Finally, propagate this change to the coordinate frames of all children
+	var xform = CoordinateFrame.ChangeOfBasis(prevCoordFrame, this.coordFrame);
+	var rotdiff = this.rotation - prevRot;
+	this.coordFrame.FromCoordinateFrame(prevCoordFrame);
+	this.rotation = prevRot;
+	this.TransformCoordFrameCascading(xform);
+	this.CascadingRotate(rotdiff);
+	
 	
 	this.UpdateTransformCascading();
 	this.Publish('Moved');
