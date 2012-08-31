@@ -21,7 +21,7 @@ CoordinateFrame.prototype.FromCoordinateFrame = function(frame)
 	vec3.set(frame.u, this.u);
 	vec3.set(frame.v, this.v);
 	vec3.set(frame.w, this.w);
-}
+};
 
 CoordinateFrame.prototype.Transform = function(xform)
 {
@@ -32,14 +32,14 @@ CoordinateFrame.prototype.Transform = function(xform)
 	vec3.normalize(this.u);
 	vec3.normalize(this.v);
 	vec3.normalize(this.w);
-}
+};
 
 CoordinateFrame.prototype.Face = function(vec)
 {
 	var facemat = mat4.identity(mat4.create());
 	mat4.face(this.w, vec, facemat);
 	this.Transform(facemat);
-}
+};
 
 CoordinateFrame.prototype.ToBasisMatrix = function()
 {
@@ -49,7 +49,19 @@ CoordinateFrame.prototype.ToBasisMatrix = function()
 						    0.0,       0.0,       0.0,       1.0);
 	mat4.transpose(m);
 	return m;
-}
+};
+
+CoordinateFrame.prototype.toJSON = function()
+{
+    return {u: vec3.toJSON(this.u), v: vec3.toJSON(this.v), w: vec3.toJSON(this.w)};
+};
+
+CoordinateFrame.prototype.fromJSON = function(json)
+{
+    this.u = vec3.create(json.u);
+    this.v = vec3.create(json.v);
+    this.w = vec3.create(json.w);
+};
 
 CoordinateFrame.ChangeOfBasis = function(cfsrc, cfdst)
 {
@@ -58,7 +70,7 @@ CoordinateFrame.ChangeOfBasis = function(cfsrc, cfdst)
 	var mdst = cfdst.ToBasisMatrix();
 	mat4.multiply(mdst, msrc);
 	return mdst;
-}
+};
 
 
 // Exports

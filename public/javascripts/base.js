@@ -2,6 +2,16 @@
 
 // TODO: namespace.
 
+Float32Array.prototype.toJSON = function() {
+    var arr = [];
+    for (var i=0; i < this.length; i++) arr.push(this[i]);
+    return arr;
+};
+
+Float32Array.fromJSON = function(json) {
+    return new Float32Array(JSON.parse(json));
+};
+
 function stringToArrayBuffer(string, callback) {
     var bb = new Blob([string]);
     var f = new FileReader();

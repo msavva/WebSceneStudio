@@ -125,3 +125,8 @@ vec3.signedAngleBetween = function(vec1, vec2, planeNormal)
 	var sign = vec3.dot(planeNormal, tmp);
 	return (sign < 0 ? -ang : ang);
 }
+
+vec3.toJSON = function(v)
+{
+    return [v[0],v[1],v[2]];
+};
