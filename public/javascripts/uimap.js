@@ -23,7 +23,10 @@ var mousedown_handlers = [];
 var mouseup_handlers = [];
 var mousemove_handlers = [];
 
-var drag_finalizers = []; // use to force all active drags to abort
+var keydown_handlers = [];
+var keyup_handlers = [];
+
+var ui_key_update_callbacks = [];
 
 var prevX = 0;
 var prevY = 0;
@@ -107,6 +110,8 @@ function setModifiersFromEvent(event) {
     mod_status[MOD_MAP.alt] = event.altKey;
 }
 
+
+
 function install()
 {
     installHandlers();
@@ -119,8 +124,12 @@ function installHandlers()
         return event.target == canvas;
     }
     
-    function dispatchMouseEvent(handler_list, event) {
-        handler_list.forEach(function(handler) {
+    function dispatchEvent(handler_list, event) {
+        var list_copy = [];
+        handler_list.forEach(function(x) { list_copy.push(x); });
+        // We make a copy to ensure that there are no conflicts
+        // if handlers are removed from their own list during processing
+        list_copy.forEach(function(handler) {
             handler(event);
         });
     }
@@ -138,7 +147,7 @@ function installHandlers()
         prevX = event.clientX;
         prevY = event.clientY;
         if(inCanvas(event))
-            dispatchMouseEvent(mousedown_handlers, event);
+            dispatchEvent(mousedown_handlers, event);
         /*console.log(event.button + " down w/ " +
                     JSON.stringify(mod_status) +
                     ", inCanvas=" + inCanvas(event));*/
@@ -149,7 +158,7 @@ function installHandlers()
         button_status[event.button] = false;
         //if(inCanvas(event))
         // ALWAYS dispatch mouse up events
-            dispatchMouseEvent(mouseup_handlers, event);
+            dispatchEvent(mouseup_handlers, event);
         /*console.log(event.button + " up w/ " +
                     JSON.stringify(mod_status) +
                     ", inCanvas=" + inCanvas(event));*/
@@ -160,7 +169,7 @@ function installHandlers()
         diffX = event.clientX - prevX;
         diffY = event.clientY - prevY;
         if(inCanvas(event))
-            dispatchMouseEvent(mousemove_handlers, event);
+            dispatchEvent(mousemove_handlers, event);
         //console.log(anyButtonDown() + " move w/ " +
         //            JSON.stringify(mod_status) +
         //            ", inCanvas=" + inCanvas(event));
@@ -213,6 +222,29 @@ function installHandlers()
         // CLEARING modifier state is safer
         mod_status = mod_proto();
     });
+    
+    
+    // these don't appear necessary
+    /*$(canvas).blur(function(event) {
+        console.log('blur in canvas');
+    });
+    $(canvas).focus(function(event) {
+        console.log('focus in canvas');
+    });*/
+    $(canvas).keydown(function(event) {
+        dispatchEvent(keydown_handlers, event);
+        ui_key_update_callbacks.forEach(function(callback) {
+            callback();
+        });
+        //console.log('keydown in canvas: ' + event.which);
+    });
+    $(canvas).keyup(function(event) {
+        dispatchEvent(keyup_handlers, event);
+        ui_key_update_callbacks.forEach(function(callback) {
+            callback();
+        });
+        //console.log('keyup in canvas: ' + event.which);
+    });
 }
 
 
@@ -221,8 +253,7 @@ format for a criterion chunk:
 [ {button: b_id, mods: [ mod_id1, ... ]}, ... ]
 */
 
-// Stole this processing mostly from madrobby/keymaster.js
-function process_criterion(criterion) {
+function commonProcessCriterion(criterion, processLastToken, last_token_name) {
     var criteria = criterion.replace(/\s/g,'').split(',');
     var N = criteria.length;
     if(criteria[N-1]=='') {
@@ -234,8 +265,9 @@ function process_criterion(criterion) {
         if(tokens.length < 1)   continue;
         
         var last_token = tokens[tokens.length-1];
-        var button = BUTTON_MAP[last_token];
-        if(button === undefined) button = invalid;
+        // INJECTED CODE HERE
+        var last_token_converted = processLastToken(last_token);
+        // END INJECTED CODE
         var mods = mod_proto();
         tokens.slice(0,-1).forEach(function(token) {
             var mapped = MOD_MAP[token];
@@ -243,15 +275,40 @@ function process_criterion(criterion) {
                 mods[mapped] = true;
         });
         
-        result.push({button: button, mods: mods});
+        var chunk = {mods: mods};
+        // INJECTED FIELD NAME
+        chunk[last_token_name] = last_token_converted;
+        result.push(chunk);
     }
     return result;
+}
+
+// Stole this processing mostly from madrobby/keymaster.js
+function processMouseCriterion(criterion) {
+    return commonProcessCriterion(criterion, function(last_token) {
+        var button = BUTTON_MAP[last_token];
+        if(button === undefined) button = invalid;
+        return button;
+    }, 'button');
+}
+
+function processKeyCriterion(criterion) {
+    return commonProcessCriterion(criterion, function(last_token) {
+        var key = KEY_MAP[last_token];
+        if(key === undefined) {
+            if(last_token.length > 1)
+                key = invalid;
+            else
+                key = last_token.charCodeAt(0);
+        }
+        return key;
+    }, 'key');
 }
 
 
 
 function mousepress(criterion, handler) {
-    process_criterion(criterion).forEach(function(chunk) {
+    processMouseCriterion(criterion).forEach(function(chunk) {
         mousedown_handlers.push(function(event) {
             if(chunk.button === event.button &&
                modMatch(chunk.mods)) {
@@ -268,9 +325,15 @@ function mousepress(criterion, handler) {
     finish: function(opts) { ... }
 }*/
 function mousedrag(criterion, handlers) {
-    if(!(handlers.start && handlers.drag && handlers.finish))
+    if(!(handlers.start && handlers.drag && handlers.finish)) {
+        throw new Error(
+            'invalid handlers object passed to uimap.mousedrag()');
         return;
-    process_criterion(criterion).forEach(function(chunk) {
+    }
+    processMouseCriterion(criterion).forEach(function(chunk) {
+        // used to keep track of whether we are in the middle of this drag
+        var isActive = false;
+        
         // set-up handler wrappers for all three stages
         // the drag is designed to install and then remove the move and finish
         function down_handler(event) {
@@ -279,39 +342,37 @@ function mousedrag(criterion, handlers) {
                 var opts = { x: event.clientX, y: event.clientY,
                              /* MORE STUFF? */ };
                 var result = handlers.start(opts);
-                if(!(opts.cancelDrag || result === false)) {
-                    // install the mouseup and mousemove handlers
-                    mouseup_handlers.push(up_handler);
-                    drag_finalizers.push(up_handler);
-                    mousemove_handlers.push(move_handler);
-                }
+                isActive = !(opts.cancel_drag || result === false);
             }
         };
         function move_handler(event) {
-            if(/* so long as we haven't finished... */ true) {
+            if(isActive &&
+               /* so long as we haven't finished... */ true) {
                 var opts = { x: event.clientX, y: event.clientY,
                              dx: diffX, dy: diffY,
                              /* MORE STUFF? */ };
                 var result = handlers.drag(opts);
-                if(opts.finishDrag || result === false) {
-                    up_handler(event); // this will uninstall
+                if(opts.finish_drag || result === false) {
+                    var finishOpts = { x: opts.x, y: opts.y };
+                    handlers.finish(opts);
+                    isActive = false;
                 }
             }
         };
         function up_handler(event) {
-            if(chunk.button === event.button) {
+            if(isActive &&
+               chunk.button === event.button) {
                 var opts = { x: event.clientX, y: event.clientY,
                              /* MORE STUFF? */ };
                 handlers.finish(opts);
-                // uninstall the move and up handlers!
-                arrayRemove(mouseup_handlers, up_handler);
-                arrayRemove(drag_finalizers, up_handler);
-                arrayRemove(mousemove_handlers, move_handler);
+                isActive = false;
             }
         };
         // install this drag behavior as triggering on appropriate
         // mouse down
         mousedown_handlers.push(down_handler);
+        mousemove_handlers.push(move_handler);
+        mouseup_handlers.push(up_handler);
     });
 }
 
@@ -322,7 +383,7 @@ function mousehover(criterion, handler) {
             buttons[chunk_button] = true;
         return buttonMatch(buttons);
     }
-    process_criterion(criterion).forEach(function(chunk) {
+    processMouseCriterion(criterion).forEach(function(chunk) {
         mousemove_handlers.push(function(event) {
             if(check_buttons(chunk.button) &&
                modMatch(chunk.mods)) {
@@ -334,12 +395,223 @@ function mousehover(criterion, handler) {
     });
 }
 
-install();
+function keypress(criterion, handler) {
+    processKeyCriterion(criterion).forEach(function(chunk) {
+        var isDown = false;
+        keydown_handlers.push(function(event) {
+            if(chunk.key === event.which &&
+               modMatch(chunk.mods)) {
+                if(!isDown) { // prevent multiple firing
+                    var opts = {x: prevX, y: prevY};
+                    handler(opts);
+                    isDown = true;
+                }
+				event.preventDefault();
+            }
+        });
+        keyup_handlers.push(function(event) {
+            if(chunk.key === event.which /* no mod match neccessary */) {
+                isDown = false;
+				event.preventDefault();
+            }
+        });
+    });
+}
+
+/* handlers = {
+    hold:    function(opts) { ... },
+    finish:  function(opts) { ... }
+}*/
+function keyhold(criterion, handlers) {
+    if(!(handlers.hold && handlers.finish)) {
+        throw new Error(
+            'invalid handlers object passed to uimap.keyhold()');
+        return;
+    }
+    processKeyCriterion(criterion).forEach(function(chunk) {
+        var isDown = false;
+        keydown_handlers.push(function(event) {
+            if(chunk.key === event.which &&
+               modMatch(chunk.mods)) {
+                // allow multiple firing, but inform the client
+                var opts = {x: prevX, y: prevY, first_press: !isDown};
+                handlers.hold(opts);
+                isDown = true;
+				event.preventDefault();
+            }
+        });
+        keyup_handlers.push(function(event) {
+            if(chunk.key === event.which /* no mod match neccessary */) {
+                var opts = {x: prevX, y: prevY};
+                handlers.finish(opts);
+                isDown = false;
+				event.preventDefault();
+            }
+        });
+    });
+}
+
+/* handlers = {
+    move:   function(opts) { ... },
+    finish:  function(opts) { ... }
+}*/
+function mouseattach_tillclick(criterion, handlers) {
+    if(!(handlers.move && handlers.finish)) {
+        throw new Error(
+            'invalid handlers object passed to uimap.mouseattach_tillclick()');
+        return;
+    }
+    
+    var all_handlers = [];
+    function install() {
+        all_handlers.forEach(function(pack) {
+            mousedown_handlers.push(pack.down_handler);
+            mousemove_handlers.push(pack.move_handler);
+            mouseup_handlers.push(pack.up_handler);
+        });
+    }
+    function uninstall() {
+        all_handlers.forEach(function(pack) {
+            arrayRemove(mousedown_handlers, pack.down_handler);
+            arrayRemove(mousemove_handlers, pack.move_handler);
+            arrayRemove(mouseup_handlers,   pack.up_handler);
+        });
+    }
+    
+    processMouseCriterion(criterion).forEach(function(chunk) {
+        // used to keep track of whether we are in the middle of this drag
+        var isPressed = false;
+        
+        // set-up handler wrappers for all three stages
+        // the drag is designed to install and then remove the move and finish
+        function down_handler(event) {
+            if(chunk.button === event.button &&
+               modMatch(chunk.mods)) {
+                isPressed = true;
+            }
+        };
+        function move_handler(event) {
+            if(/* so long as we haven't finished... */ true) {
+                var opts = { x: event.clientX, y: event.clientY,
+                             dx: diffX, dy: diffY,
+                             /* MORE STUFF? */ };
+                var result = handlers.move(opts);
+                if(opts.finish_move || result === false) {
+                    var finishOpts = { x: opts.x, y: opts.y };
+                    handlers.finish(opts);
+                    uninstall();
+                }
+            }
+        };
+        function up_handler(event) {
+            if(isPressed &&
+               chunk.button === event.button) {
+                var opts = { x: event.clientX, y: event.clientY,
+                             /* MORE STUFF? */ };
+                handlers.finish(opts);
+                uninstall();
+            }
+        };
+        
+        all_handlers.push({
+            down_handler: down_handler,
+            move_handler: move_handler,
+            up_handler:   up_handler,
+        });
+    });
+    
+    install(); // installs handlers for mouseattach_tillclick behavior
+}
+
+/* handlers = {
+    move:   function(opts) { ... },
+    finish:  function(opts) { ... }
+}*/
+function mouseattach_tillkey(criterion, handlers) {
+    if(!(handlers.move && handlers.finish)) {
+        throw new Error(
+            'invalid handlers object passed to uimap.mouseattach_tillkey()');
+        return;
+    }
+    
+    var all_handlers = [];
+    function install() {
+        all_handlers.forEach(function(pack) {
+            keydown_handlers.push(pack.down);
+            mousemove_handlers.push(pack.move);
+            keyup_handlers.push(pack.up);
+        });
+    }
+    function uninstall() {
+        all_handlers.forEach(function(pack) {
+            arrayRemove(mousedown_handlers, pack.down);
+            arrayRemove(mousemove_handlers, pack.move);
+            arrayRemove(mouseup_handlers,   pack.up);
+        });
+    }
+    
+    processKeyCriterion(criterion).forEach(function(chunk) {
+        // used to keep track of whether we are in the middle of this drag
+        var isPressed = false;
+        
+        // set-up handler wrappers for all three stages
+        // the drag is designed to install and then remove the move and finish
+        function down_handler(event) {
+            if(chunk.key === event.which &&
+               modMatch(chunk.mods)) {
+                isPressed = true;
+				event.preventDefault();
+            }
+        };
+        function move_handler(event) {
+            if(/* so long as we haven't finished... */ true) {
+                var opts = { x: event.clientX, y: event.clientY,
+                             dx: diffX, dy: diffY,
+                             /* MORE STUFF? */ };
+                var result = handlers.move(opts);
+                if(opts.finish_move || result === false) {
+                    var finishOpts = { x: opts.x, y: opts.y };
+                    handlers.finish(opts);
+                    uninstall();
+                }
+            }
+        };
+        function up_handler(event) {
+            if(isPressed &&
+               chunk.key === event.which) {
+                var opts = { x: event.clientX, y: event.clientY,
+                             /* MORE STUFF? */ };
+                handlers.finish(opts);
+                uninstall();
+				event.preventDefault();
+            }
+        };
+        
+        all_handlers.push({
+            down: down_handler,
+            move: move_handler,
+            up:   up_handler,
+        });
+    });
+    
+    install(); // installs handlers for mouseattach_tillkey behavior
+}
+
+function allkeyupdates(callback) {
+    ui_key_update_callbacks.push(callback);
+}
+
+install(); // installs the entire uimap
 
 return {
-    mousepress: mousepress,
-    mousedrag: mousedrag,
-    mousehover: mousehover,
+    mousepress:             mousepress,
+    mousedrag:              mousedrag,
+    mousehover:             mousehover,
+    keypress:               keypress,
+    keyhold:                keyhold,
+    mouseattach_tillclick:  mouseattach_tillclick,
+    mouseattach_tillkey:    mouseattach_tillkey,
+    allkeyupdates:          allkeyupdates,
 };
 
 } // END create(canvas)

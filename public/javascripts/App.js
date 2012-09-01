@@ -20,15 +20,19 @@ define([
 function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, SearchController,
 		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, PubSub, SplitView, uimap)
 {
+    // support function should be factored out...?
+    function mapTable(table, perField) {
+        var result = {};
+        for(var key in table)
+            result[key] = perField(key, table[key]);
+        return result;
+    }
 
     function UIState(gl)
     {
-        // Mouse state
-        this.mouseButtonsDown = [false, false, false];
+        // Mouse state (THESE SHOULD DIE, but I haven't fixed the last hole)
         this.mousePrevX = -1;
         this.mousePrevY = -1;
-        this.moveSelectedX = -1;
-        this.moveSelectedY = -1;
 
         // Keeping track of which object will be manipulated during
         // mouse interactions. This is the object that is under the mouse
@@ -44,12 +48,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
         // Model copying/pasting
         this.copyInstance = null;
-        this.copying = false;
-        this.pasting = false;
-		
-		// Undo/redo
-		this.undoRedoing = false;
-		this.undoRedoWhich = null;
 
         this.isBusy = false;
     }
@@ -107,7 +105,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		this.renderer.resizeEnd();
         this.UpdateView();
     };
-
+    
     App.prototype.UpdateView = function ()
     {
         // While the view is changing, no object in the scene should have focus
@@ -118,9 +116,14 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         mat4.multiply(this.renderer.proj_, this.renderer.view_, this.renderer.viewProj_);
         this.renderer.postRedisplay();
     };
-
+    
     App.prototype.AttachEventHandlers = function ()
     {
+        // Try to prevent accidental navigation away from app
+        window.onbeforeunload = function(e) {
+            return 'If you leave this page, you may lose unsaved work!'
+        }
+        
         /*** Behaviors are specified here ***/
 
         // Keeping track of what object is under the mouse cursor
@@ -134,7 +137,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         } .bind(this));
 
         // orbiting rotation
-        this.uimap.mousedrag('right, ctrl+left', {
+        var orbiting_behavior = {
             start: function (data) { },
             drag: function (data)
             {
@@ -143,10 +146,11 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
                 this.UpdateView();
             } .bind(this),
             finish: function (data) { }
-        });
+        };
+        this.uimap.mousedrag('right, ctrl+left', orbiting_behavior);
 
         // dollying
-        this.uimap.mousedrag('middle, ctrl+right, ctrl+shift+left', {
+        var dollying_behavior = {
             start: function (data) { },
             drag: function (data)
             {
@@ -155,10 +159,12 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
                 this.UpdateView();
             } .bind(this),
             finish: function (data) { }
-        });
+        };
+        this.uimap.mousedrag('middle, ctrl+right, ctrl+shift+left',
+                             dollying_behavior);
 
         // interactions with 3d objects in the scene (instances, manipulators)
-        this.uimap.mousedrag('left', {
+        var interacting_behavior = {
             start: function (data)
             {
                 // prevent other interaction while inserting
@@ -189,7 +195,8 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
                     this.renderer.postRedisplay();
                 this.UpdateFocusedObject(data);
             } .bind(this)
-        });
+        };
+        this.uimap.mousedrag('left', interacting_behavior);
 
         // model insertion IDEALLY THIS WOULD BE A SINGLE REGISTERED BEHAVIOR
         this.uimap.mousepress('left', function ()
@@ -207,24 +214,138 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
 		// mouse wheel scrolls
         addWheelHandler(this.canvas, this.MouseWheel.bind(this));
-
-		// key presses
-        $("body").keydown(
-		function (event)
-		{
-		    if (this.KeyDown(event.which, event.ctrlKey, event.shiftKey, event.altKey))
-				event.preventDefault();
-		} .bind(this)
-		);
-        $("body").keyup(
-		function (event)
-		{
-		    if (this.KeyUp(event.which, event.ctrlKey, event.shiftKey, event.altKey))
-				event.preventDefault();
-		} .bind(this)
-		);
+        
+        // some support functions
+        var ensureInstance = function(toWrap) {
+            var helper = function(opts) {
+                if(this.uistate.insertInstance) {
+                    opts.instance = this.uistate.insertInstance;
+                } else if(this.uistate.selectedInstance) {
+                    opts.instance = this.uistate.selectedInstance;
+                    opts.saveUndo = true;
+                } else {
+                    return false;
+                }
+                return true;
+            }.bind(this);
+            if($.isFunction(toWrap)) {
+                return function(opts) {
+                    if(helper(opts))
+                        toWrap(opts);
+                };
+            } else  {
+                return mapTable(toWrap, function(key, callback) {
+                    return function(opts) {
+                        if(helper(opts))
+                            callback(opts);
+                    };
+                });
+            }
+        }.bind(this);
+        
+        // Keyboard Rotate/Scale
+        var rotateIncrement = Constants.keyboardRotationIncrementUnmodified;
+        var scaleIncrement  = Constants.keyboardScaleFactorUnmodified;
+        var rotate_left_behavior = ensureInstance({
+            hold: function(opts) {
+                opts.instance.CascadingRotate(rotateIncrement);
+            },
+            finish: function(opts) {
+                if(opts.saveUndo) 
+                    this.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE,
+                                                    opts.instance);
+            }.bind(this)
+        });
+        this.uimap.keyhold('left', rotate_left_behavior);
+        var rotate_right_behavior = ensureInstance({
+            hold: function(opts) {
+                opts.instance.CascadingRotate(-rotateIncrement);
+            },
+            finish: function(opts) {
+                if(opts.saveUndo) 
+                    this.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE,
+                                                    opts.instance);
+            }.bind(this)
+        });
+        this.uimap.keyhold('right', rotate_right_behavior);
+        var scale_up_behavior = ensureInstance({
+            hold: function(opts) {
+                opts.instance.CascadingScale(scaleIncrement);
+            },
+            finish: function(opts) {
+                if(opts.saveUndo) 
+                    this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE,
+                                                    opts.instance);
+            }.bind(this)
+        });
+        this.uimap.keyhold('up', scale_up_behavior);
+        var scale_down_behavior = ensureInstance({
+            hold: function(opts) {
+                opts.instance.CascadingScale(1.0 / scaleIncrement);
+            },
+            finish: function(opts) {
+                if(opts.saveUndo) 
+                    this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE,
+                                                    opts.instance);
+            }.bind(this)
+        });
+        this.uimap.keyhold('down', scale_down_behavior);
+        
+        // Keyboard Tumble
+        this.uimap.keyhold('M', ensureInstance({
+            hold: function(opts) {
+                this.Tumble(opts.instance, false);
+            }.bind(this),
+            finish: function(opts) {
+                if(opts.saveUndo) 
+                    this.undoStack.pushCurrentState(
+                        UndoStack.CMDTYPE.SWITCHFACE, opts.instance);
+            }.bind(this)
+        }));
+        
+        // Copy/Paste
+        this.uimap.keypress('ctrl+C', function() {
+            this.Copy();
+        }.bind(this));
+        this.uimap.keypress('ctrl+V', function(opts) {
+            this.Paste(opts);
+        }.bind(this));
+        // Undo/Redo
+        this.uimap.keypress('ctrl+Z', function() {
+            this.CancelModelInsertion();
+            this.Undo();
+        }.bind(this));
+        this.uimap.keypress('ctrl+Y', function() {
+            this.CancelModelInsertion();
+            this.Redo();
+        }.bind(this));
+        
+        // Delete object, Escape selection
+        this.uimap.keypress('delete, backspace', function() {
+            this.Delete();
+        }.bind(this));
+        this.uimap.keypress('escape', function() {
+            this.CancelModelInsertion();
+            this.SelectInstance(null);
+        }.bind(this));
+        
+        // open dialog
+        this.uimap.keypress('Q', function() {
+            this.architectureGenerator.openDialog();
+        }.bind(this));
+        
+        // debug which instance is currently being manipulated
+        this.uimap.keypress('X', ensureInstance(function(opts) {
+            console.log(opts.instance.model.id);
+        }));
+        
+        
+        // ensure the scene re-renders on all key events
+        this.uimap.allkeyupdates(function() {
+            this.renderer.postRedisplay();
+        }.bind(this));
     };
-
+    
     App.prototype.UpdateFocusedObject = function (data)
     {
         var oldobj = this.uistate.focusedObject;
@@ -240,7 +361,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         if (needsRedisplay)
             this.renderer.postRedisplay();
     };
-
+    
     App.prototype.ToggleBusy = function (isBusy)
     {
         this.uistate.isBusy = isBusy;
@@ -249,142 +370,12 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         else
             $('#ui').removeClass('busy');
     };
-
-	// TODO: KeyUp and KeyDown really should be converted to unified 'behavior' specifications
-	// a la UIMap at some point.
-	
-    App.prototype.KeyDown = function (which, ctrl, shift, alt)
-    {
-		var handled = true;
-		
-		var instanceToModify = null;
-        if (this.uistate.insertInstance) instanceToModify = this.uistate.insertInstance;
-        else if (this.uistate.selectedInstance) instanceToModify = this.uistate.selectedInstance;
-
-        switch (which)
-        {
-            case 37: // left arrow key
-				instanceToModify.CascadingRotate(Constants.keyboardRotationIncrementUnmodified);
-                break;
-            case 38: // up arrow key
-				instanceToModify.CascadingScale(Constants.keyboardScaleFactorUnmodified);
-                break;
-            case 39: // right arrow key
-                instanceToModify.CascadingRotate(-Constants.keyboardRotationIncrementUnmodified);
-                break;
-            case 40: // down arrow key
-				instanceToModify.CascadingScale(1.0 / Constants.keyboardScaleFactorUnmodified);
-                break;
-            case 77: // M key
-				this.Tumble(instanceToModify, false);
-                break;
-            case 67: // C key
-                if (ctrl) this.BeginCopy();
-                break;
-            case 86: // V key
-                if (ctrl) this.BeginPaste();
-                break;
-            case 90: // Z key
-                if (ctrl) this.BeginUndoRedo('undo');
-                break;
-            case 89: // Y key
-                if (ctrl) this.BeginUndoRedo('redo');
-                break;
-			default:
-				handled = false;
-				break;
-        }
-
-        this.renderer.postRedisplay();
-		return handled;
-    };
-
-    App.prototype.KeyUp = function (which, ctrl, shift, alt)
-    {
-		var handled = true;
-		
-		var instanceToModify = null;
-        var saveUndo = false;
-        if (this.uistate.insertInstance) instanceToModify = this.uistate.insertInstance;
-        else if (this.uistate.selectedInstance)
-        {
-            instanceToModify = this.uistate.selectedInstance;
-            saveUndo = true;
-        }
-
-        switch (which)
-        {
-            case 27: // ESCAPE key
-                this.CancelModelInsertion();
-				this.SelectInstance(null);
-                break;
-            case 46: // DELETE key
-                this.Delete();
-                break;
-            case 67: // C key
-                this.EndCopy();
-                break;
-            case 86: // V key
-                this.EndPaste();
-                break;
-            case 81: // Q key
-                //console.log(JSON.stringify(this.camera, null));
-                //this.architectureGenerator.Test();
-                this.architectureGenerator.openDialog();
-                break;
-			case 90: // Z key
-                this.EndUndoRedo();
-                break;
-            case 89: // Y key
-                this.EndUndoRedo();
-                break;
-			case 37: case 39: // left/right arrow keys
-				if (instanceToModify && saveUndo)
-					this.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE, instanceToModify);
-                break;
-            case 38: case 40: // up/down arrow keys
-				if (instanceToModify && saveUndo)
-					this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE, instanceToModify);
-                break;
-			case 77: // M key
-				if (instanceToModify && saveUndo)
-					this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SWITCHFACE, instanceToModify);
-                break;
-            case 88:
-                if (instanceToModify)
-                    console.log(instanceToModify.model.id);
-                break;
-            default:
-				handled = false;
-                break;
-        }
-
-        // Redisplay in case we've changed something
-        this.renderer.postRedisplay();
-		return handled;
-    };
-
+    
     App.prototype.MouseWheel = function (dx, dy)
     {
         this.camera.Zoom(dy * Constants.cameraZoomSpeed);
         this.UpdateView();
     };
-	
-	App.prototype.BeginUndoRedo = function(whichOp)
-	{
-		this.CancelModelInsertion();
-		this.uistate.undoRedoing = true;
-		this.uistate.undoRedoWhich = whichOp;
-	}
-	
-	App.prototype.EndUndoRedo = function()
-	{
-		if (this.uistate.undoRedoWhich === 'undo')
-			this.Undo();
-		else if (this.uistate.undoRedoWhich === 'redo')
-			this.Redo();
-		this.uistate.undoRedoing = false;
-	}
 	
 	App.prototype.Undo = function()
 	{
@@ -397,16 +388,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		this.undoStack.redo();
 		this.renderer.postRedisplay();
 	}
-
-    App.prototype.BeginCopy = function ()
-    {
-        if (!this.uistate.copying)
-        {
-			this.Copy();
-            this.uistate.copying = true;
-        }
-    };
-	
+    
 	App.prototype.Copy = function()
 	{
 		if (this.uistate.selectedInstance)
@@ -420,22 +402,8 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 			this.Publish('CopyCompleted');
 		}
 	}
-
-    App.prototype.EndCopy = function ()
-    {
-        this.uistate.copying = false;
-    };
-
-    App.prototype.BeginPaste = function ()
-    {
-        if (!this.uistate.pasting)
-        {
-			this.Paste();
-            this.uistate.pasting = true;
-        }
-    };
 	
-	App.prototype.Paste = function()
+	App.prototype.Paste = function(opts)
 	{
 		if (this.uistate.copyInstance)
         {
@@ -451,15 +419,12 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             hi.SetParent(null);
 			
 			// Necessary to get the inserting model to show up without moving the mouse.
-			this.ContinueModelInsertion(this.uistate.mousePrevX, this.uistate.mousePrevY);
+            if(!opts) opts = { x: this.uistate.mousePrevX,
+                               y: this.uistate.mousePrevY, };
+			this.ContinueModelInsertion(opts.x, opts.y);
         }
 	}
-
-    App.prototype.EndPaste = function ()
-    {
-        this.uistate.pasting = false;
-    };
-	
+    
 	App.prototype.Delete = function()
 	{
 		var selectedMinst = this.uistate.selectedInstance;
