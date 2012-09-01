@@ -10,7 +10,8 @@ html
         canvas#canvas(oncontextmenu="return false;", tabindex="-1",
                       onclick="$('#canvas').focus();")
       #graphicsOverlay
-        #toolbar
+        toolbar#toolbar(oncontextmenu="$('#canvas').focus(); return false;",
+                      onclick="$('#canvas').focus();")
       #searchArea
         h3#searchInputHeader Model Search
         input(type="text", id="searchInputBox")
