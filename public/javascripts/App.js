@@ -60,6 +60,8 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		PubSub.call(this);
 		
         this.canvas = canvas;
+        
+        this.uimap = uimap.create(canvas);
 
         this.camera = new Camera();
         var cameraData = JSON.parse("{\"eyePos\":{\"0\":3.776055335998535,\"1\":-187.77793884277344,\"2\":164.77069091796875,\"buffer\":{\"byteLength\":12},\"length\":3,\"byteOffset\":0,\"byteLength\":12},\"lookAtPoint\":{\"0\":0,\"1\":1,\"2\":0,\"buffer\":{\"byteLength\":12},\"length\":3,\"byteOffset\":0,\"byteLength\":12},\"upVec\":{\"0\":-0.01314918976277113,\"1\":0.6573730707168579,\"2\":0.7534525990486145,\"buffer\":{\"byteLength\":12},\"length\":3,\"byteOffset\":0,\"byteLength\":12},\"lookVec\":{\"0\":-0.015068011358380318,\"1\":0.7533015012741089,\"2\":-0.6575027108192444,\"buffer\":{\"byteLength\":12},\"length\":3,\"byteOffset\":0,\"byteLength\":12},\"leftVec\":{\"0\":-0.9998010993003845,\"1\":-0.019998691976070404,\"2\":0,\"buffer\":{\"byteLength\":12},\"length\":3,\"byteOffset\":0,\"byteLength\":12}}");
@@ -123,7 +125,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
         // Keeping track of what object is under the mouse cursor
         // while the mouse is idly moving across the screen.
-        uimap.mousehover('none', function (data)
+        this.uimap.mousehover('none', function (data)
         {
 			this.uistate.mousePrevX = data.x;
 			this.uistate.mousePrevY = data.y;
@@ -132,7 +134,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         } .bind(this));
 
         // orbiting rotation
-        uimap.mousedrag('right, ctrl+left', {
+        this.uimap.mousedrag('right, ctrl+left', {
             start: function (data) { },
             drag: function (data)
             {
@@ -144,7 +146,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         });
 
         // dollying
-        uimap.mousedrag('middle, ctrl+right, ctrl+shift+left', {
+        this.uimap.mousedrag('middle, ctrl+right, ctrl+shift+left', {
             start: function (data) { },
             drag: function (data)
             {
@@ -156,7 +158,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         });
 
         // interactions with 3d objects in the scene (instances, manipulators)
-        uimap.mousedrag('left', {
+        this.uimap.mousedrag('left', {
             start: function (data)
             {
                 // prevent other interaction while inserting
@@ -190,14 +192,14 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         });
 
         // model insertion IDEALLY THIS WOULD BE A SINGLE REGISTERED BEHAVIOR
-        uimap.mousepress('left', function ()
+        this.uimap.mousepress('left', function ()
         {
             if (this.uistate.insertInstance)
             {
                 this.FinishModelInsertion();
             }
         } .bind(this));
-        uimap.mousehover('none', function (data)
+        this.uimap.mousehover('none', function (data)
         {
             if (this.uistate.insertInstance)
                 this.ContinueModelInsertion(data.x, data.y);

@@ -12,6 +12,11 @@ function(){
 // https://github.com/madrobby/keymaster/
 
 
+// WRAP everything in another function which will create
+// an instance.  This ensures proper data encapsulation/privacy
+// while allowing for instancing of the uimap module!
+function create(canvas) {
+
 // MODULE VARIABLES...
 
 var mousedown_handlers = [];
@@ -109,9 +114,9 @@ function install()
 
 function installHandlers()
 {
-    var canvasId = $('#canvas')[0];
+    canvas = canvas || $('#canvas')[0];
     function inCanvas(event) {
-        return event.target == canvasId;
+        return event.target == canvas;
     }
     
     function dispatchMouseEvent(handler_list, event) {
@@ -329,13 +334,19 @@ function mousehover(criterion, handler) {
     });
 }
 
-$(document).ready(install());
+install();
+
+return {
+    mousepress: mousepress,
+    mousedrag: mousedrag,
+    mousehover: mousehover,
+};
+
+} // END create(canvas)
 
 // Exports
 return {
-	mousepress: mousepress,
-	mousedrag: mousedrag,
-	mousehover: mousehover
+    create: create,
 };
 
 });
