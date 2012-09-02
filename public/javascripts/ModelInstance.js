@@ -254,7 +254,9 @@ ModelInstance.prototype.SetParent = function(parInst)
 	// Add to new parent
 	this.parent = parInst;
 	if (parInst)
-		parInst.children.push(this);
+    {
+        parInst.children.push(this);
+    }
 };
 
 ModelInstance.prototype.AccumRotationTransform = function()
@@ -305,8 +307,12 @@ ModelInstance.prototype.ResetCoordFrame = function()
 ModelInstance.prototype.UpdateStateFromRayIntersection = function(isect)
 {
 	var oldParent = this.parent;
-	
-	this.SetParent(isect.inst);
+	var newParent = isect.inst;
+
+    // Ignore intersection if picked parent is not a ModelInstance
+    if (!(newParent instanceof ModelInstance)) return; //TODO: Would be cleaner to modify pickability of Manipulators instead
+
+	this.SetParent(newParent);
 	this.parentMeshI = isect.geoID;
 	this.parentTriI = isect.triI;
 	this.parentUV = isect.uv;
