@@ -123,7 +123,7 @@ window.requestAnimFrame = window.requestAnimationFrame ||
 function getHttpRequest(url, onload, opt_onprogress) {
   var LISTENERS = {
     load: function(e) { onload(req, e); },
-    progress: function(e) { opt_onprogress && opt_onprogress(req, e); },
+    progress: function(e) { opt_onprogress && opt_onprogress(req, e); }
   };
 
   var req = new XMLHttpRequest();
@@ -195,7 +195,6 @@ function ensurePowerOfTwo(image)
         var canvas = document.createElement("canvas");
         canvas.width = nextHighestPowerOfTwo(image.width);
         canvas.height = nextHighestPowerOfTwo(image.height);
-        console.log("" + canvas.width + "," + canvas.height);
         var ctx = canvas.getContext("2d");
         ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);
         return canvas;
