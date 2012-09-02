@@ -30,10 +30,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
     function UIState(gl)
     {
-        // Mouse state (THESE SHOULD DIE, but I haven't fixed the last hole)
-        this.mousePrevX = -1;
-        this.mousePrevY = -1;
-
         // Keeping track of which object will be manipulated during
         // mouse interactions. This is the object that is under the mouse
         // cursor--or, if an interaction is in progress, this is the object
@@ -130,8 +126,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         // while the mouse is idly moving across the screen.
         this.uimap.mousehover('none', function (data)
         {
-			this.uistate.mousePrevX = data.x;
-			this.uistate.mousePrevY = data.y;
             if (!this.uistate.insertInstance)
                 this.UpdateFocusedObject(data);
         } .bind(this));
@@ -418,10 +412,12 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
             hi.SetParent(null);
 			
-			// Necessary to get the inserting model to show up without moving the mouse.
-            if(!opts) opts = { x: this.uistate.mousePrevX,
-                               y: this.uistate.mousePrevY, };
-			this.ContinueModelInsertion(opts.x, opts.y);
+			// Necessary to get the inserting model to show up
+			// without having to move the mouse.
+			// If no mouse position data is provided, then we
+			// assume that we can wait until the mouse starts moving
+            if(opts)
+                this.ContinueModelInsertion(opts.x, opts.y);
         }
 	}
     
