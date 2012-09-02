@@ -7,7 +7,8 @@ define([
 	'Model',
 	'AssetCache',
 	'Material',
-	'loader'
+	'loader',
+    'base'
 ],
 function(Constants, Mesh, Texture, Model, AssetCache, Material){
 
@@ -234,33 +235,6 @@ AssetManager.prototype.DownloadTexture = function(url, callback)
 	
 	this.downloadingImages[url] = image;
 	image.src = Constants.textureDir + url;
-}
-
-function ensurePowerOfTwo(image)
-{
-	if (!isPowerOfTwo(image.width) || !isPowerOfTwo(image.height))
-	{
-        var canvas = document.createElement("canvas");
-        canvas.width = nextHighestPowerOfTwo(image.width);
-        canvas.height = nextHighestPowerOfTwo(image.height);
-        var ctx = canvas.getContext("2d");
-		ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);
-        return canvas;
-    }
-	return image;
-}
-function isPowerOfTwo(x)
-{
-    return (x & (x - 1)) == 0;
-}
- 
-function nextHighestPowerOfTwo(x)
-{
-    --x;
-    for (var i = 1; i < 32; i <<= 1) {
-        x = x | x >> i;
-    }
-    return x + 1;
 }
 
 // Exports

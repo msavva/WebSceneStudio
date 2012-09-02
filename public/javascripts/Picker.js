@@ -107,8 +107,11 @@ Picker.prototype.PickTriangle = function(x, y, camera, renderer)
 	
 	// It should be impossible for there to be no intersection; the pick buffer
 	// had something at this location, so there should be something to intersect.
-	if (intersects.length == 0)
-		throw new Error('IMPOSSIBRU! 0 ray intersections found for a non-background pickbuffer pixel!');
+	if (intersects.length == 0) {
+        console.log(obj);
+        console.log(modelGeoIDs);
+        throw new Error('IMPOSSIBRU! 0 ray intersections found for a non-background pickbuffer pixel belonging to above obj and IDs!');
+    }
     
     // Pull out closest intersection and augment with model,geo ids
     var intersect = intersects[0];
