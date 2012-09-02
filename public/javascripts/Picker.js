@@ -107,10 +107,13 @@ Picker.prototype.PickTriangle = function(x, y, camera, renderer)
 	
 	// It should be impossible for there to be no intersection; the pick buffer
 	// had something at this location, so there should be something to intersect.
+    // TODO: This is most likely due to asynchronous postRedisplay calls resulting in out-of-sync pick buffers
+    // However, it should be safe to ignore such out-of-sync intersections
 	if (intersects.length == 0) {
-        console.log(obj);
-        console.log(modelGeoIDs);
-        throw new Error('IMPOSSIBRU! 0 ray intersections found for a non-background pickbuffer pixel belonging to above obj and IDs!');
+        return undefined;
+        //console.log(obj);
+        //console.log(modelGeoIDs);
+        //throw new Error('IMPOSSIBRU! 0 ray intersections found for a non-background pickbuffer pixel belonging to above obj and IDs!');
     }
     
     // Pull out closest intersection and augment with model,geo ids
