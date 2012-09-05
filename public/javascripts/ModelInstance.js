@@ -6,8 +6,7 @@ define([
 	'UndoStack',
 	'CoordinateFrame',
 	'gl-matrix',
-	'gl-matrix-ext',
-    'msgpack'
+	'gl-matrix-ext'
 ],
 function(Constants, PubSub, UndoStack, CoordinateFrame){
 
@@ -82,73 +81,6 @@ ModelInstance.fromJSONString = function(string, assman, modelMap)
     return newMinst;
 };
 
-ModelInstance.prototype.Serialize = function()
-{
-	// Save special members
-	var modelID = this.model.id;
-	var oldParent = this.parent;
-	var oldModel = this.model;
-	var oldChildren = this.children;
-    var oldSubscribers = this.subscribers;
-	
-	// Remove special members
-	this.parent = null;
-	this.model = null;
-	this.children = [];
-    this.subscribers = {};
-	
-	// Pack into bytes
-	var bytes = msgpack.pack(this);
-	
-	// Restore special members
-	this.parent = oldParent;
-	this.model = oldModel;
-	this.children = oldChildren;
-    this.subscribers = oldSubscribers;
-	
-	// Create packed object, store parent index
-	var packedMinst = {bytes: bytes, modelID: modelID, parentIndex: -1};
-	if (this.parent) packedMinst.parentIndex = this.parent.index;
-	
-	return packedMinst;
-};
-
-/**
- * Deserializes ModelInstance. Note that transform and parent/children instances need to be re-instated by caller.
- * Optional argument modelMap to get stored Model objects instead of calling AssetManager assman to retrieve them again
- **/
-ModelInstance.Deserialize = function(packedMinst, assman, modelMap)
-{
-    // If modelMap was not given, retrieve model from AssMan
-    var model;
-    if (!modelMap)
-    {
-        assman.GetModel(packedMinst.modelID, function(m) { model = m; }.bind(this)); // TODO: Dangerous! Handle this in a proper asynchronous style
-    }
-    else // Else get stored model from modelMap
-    {
-        model = modelMap[packedMinst.modelID];
-    }
-	
-	// Unpack serialized bytes, create new ModelInstance with model and copy over basic fields
-	var unpacked = msgpack.unpack(packedMinst.bytes);
-	var newMinst = new ModelInstance(model, null);
-	newMinst.index = unpacked.index;
-	newMinst.parentMeshI = unpacked.parentMeshI;
-	newMinst.parentTriI = unpacked.parentTriI;
-	newMinst.parentUV = new Float32Array(unpacked.parentUV);
-	newMinst.cubeFace = unpacked.cubeFace;
-	newMinst.scale = unpacked.scale;
-	newMinst.rotation = unpacked.rotation;
-	newMinst.coordFrame.FromCoordinateFrame(unpacked.coordFrame);
-	
-	// Copy over parent index. Actual model will need to be re-instated at a later time
-	// by the logic that has requested deserialization
-	newMinst.parentIndex = packedMinst.parentIndex;
-	
-	return newMinst;
-};
-
 ModelInstance.prototype.Clone = function()
 {	
 	var newMinst = new ModelInstance(this.model, null);
@@ -193,7 +125,7 @@ ModelInstance.prototype.CascadingRotate = function (rotate)
 	{
 		mInst.coordFrame.Transform(rotmat);
 		mInst.children.forEach(helper);
-	}
+	};
 	this.children.forEach(helper);
 	this.UpdateTransformCascading();
 };
@@ -218,7 +150,7 @@ ModelInstance.prototype.Tumble = function()
 	this.cubeFace = (this.cubeFace + 1) % 6;
 	this.Publish('Tumbled');
 	this.UpdateTransformCascading();
-}
+};
 
 ModelInstance.prototype.SetReasonableScale = function (scene)
 {
@@ -273,7 +205,7 @@ ModelInstance.prototype.AccumRotationTransform = function()
 	}
 	
 	return xform;
-}
+};
 
 ModelInstance.prototype.TransformCoordFrameCascading = function(xform)
 {
@@ -281,7 +213,7 @@ ModelInstance.prototype.TransformCoordFrameCascading = function(xform)
 	this.children.forEach(function(mInst) {
 		mInst.TransformCoordFrameCascading(xform);
 	});
-}
+};
 
 ModelInstance.prototype.ResetCoordFrame = function()
 {		
@@ -302,7 +234,7 @@ ModelInstance.prototype.ResetCoordFrame = function()
 	
 	// Finally, replace the coordinate frame
 	this.coordFrame.FromCoordinateFrame(newFrame);
-}
+};
 
 ModelInstance.prototype.UpdateStateFromRayIntersection = function(isect)
 {
@@ -579,7 +511,7 @@ ModelInstance.prototype.BeginMouseInteract = function(data)
 		isInteracting: false,
 		origFrame: new CoordinateFrame(),
 		origRot: this.rotation
-	}
+	};
 	this.moveState.origFrame.FromCoordinateFrame(this.coordFrame);
 
 	// Hide the cursor while moves are happening

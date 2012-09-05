@@ -145,7 +145,7 @@ Scene.prototype.Serialize = function()
 	var packedModels = [];
     var modelMap = [];
 	this.modelList.forEach(function(model){
-		packedModels.push(model.Serialize());
+		packedModels.push(model.toJSONString());
         modelMap[model.model.id] = model.model;
 	});
 	return { packedModels: packedModels, modelMap: modelMap };
@@ -156,7 +156,7 @@ Scene.prototype.LoadFromSerialized = function(serializedScene, assman)
     this.Reset();
 
 	serializedScene.packedModels.forEach(function(packedModel){
-		var model = ModelInstance.Deserialize(packedModel, assman, serializedScene.modelMap);
+		var model = ModelInstance.fromJSONString(packedModel, assman, serializedScene.modelMap);
 		if (model.index === -1) // Root model
         {
             this.modelList[0] = model;
