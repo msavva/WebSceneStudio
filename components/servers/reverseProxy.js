@@ -22,6 +22,7 @@ var options = {
 
 function start() {
     httpProxy.createServer(options).listen(8000);
+    console.log('Launching Reverse Proxy on Port 8000');
 }
 
 // Alternately, you can use the following proxy setup
