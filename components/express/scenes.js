@@ -20,12 +20,14 @@ function getNewSceneID() {
     return new_id;
 }
 
-exports.scenes = function(req, res) {
-    var params = default_params();
-    params.username = req.session.username;
-    params.scenes = dummy_scene_list;
-    res.render('scenes', params);
-};
+function getSceneNamed(scene_name) {
+    for (var key in dummy_scene_list) {
+        var scene = dummy_scene_list[key];
+        if(scene.name == scene_name)
+            return scene;
+    }
+    return undefined;
+}
 
 // TODO: Also validate on user side
 function validateSceneName(scene_name) {
@@ -45,29 +47,35 @@ function createNewScene(scene_name) {
     };
 }
 
+function saveScene(scene_name, scene_data) {
+    var scene = getSceneNamed(scene_name);
+    scene.data = scene_data;
+    console.log(scene.data);
+}
+
+
+
+exports.scenes = function(req, res) {
+    var params = default_params();
+    params.username = req.session.username;
+    params.scenes = dummy_scene_list;
+    res.render('scenes', params);
+};
+
 exports.newScene = function(req, res) {
     var scene_name = req.body.scene_name;
-    console.log('hoo-eee, stub it up here');
     console.log('scene name raw: ' + scene_name);
     console.log('is valid? ' + validateSceneName(scene_name));
     if(!validateSceneName(scene_name)) {
         // TODO: Display Error to the User
         res.redirect('/scenes');
         // TODO: Any way to redirect to current page? more flexible then
+        //   UPDATE: Looks like session variables are the way to do this
     } else {
         createNewScene(scene_name);
         // Assuming we are successful, then show the new scene
         res.redirect('/scenes/' + scene_name + '/edit');
     }
-}
-
-function getSceneNamed(scene_name) {
-    for (var key in dummy_scene_list) {
-        var scene = dummy_scene_list[key];
-        if(scene.name == scene_name)
-            return scene;
-    }
-    return undefined;
 }
 
 exports.editScene = function(req, res) {
@@ -80,6 +88,27 @@ exports.editScene = function(req, res) {
         var params = default_params();
         params.username = req.session.username;
         params.scene = scene;
+        params.close_url = '/scenes/';
         res.render('editScene', params);
+    }
+}
+
+exports.saveScene = function(req, res) {
+    var scene_name = req.params.scene_name;
+    var scene_file = req.body.scene_file;
+    console.log('saving ... \n' + scene_name);
+    console.log('data type:\n' + (typeof scene_file));
+    saveScene(scene_name, scene_file);
+    res.send();
+}
+
+exports.loadScene = function(req, res) {
+    var scene_name = req.params.scene_name;
+    var scene = getSceneNamed(scene_name);
+    if(scene.data) {
+        var json_file = scene.data;
+        res.send(json_file);
+    } else {
+        res.send(404); // signal no scene data with a 404 error right now
     }
 }

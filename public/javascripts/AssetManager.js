@@ -24,6 +24,7 @@ function AssetManager(gl)
 	this.downloadingModels = {};
 	this.downloadingMeshes = {};
 	this.downloadingImages = {};
+	this.callOnDownload    = {}; // callbacks for when downloads finish
 }
 
 AssetManager.prototype.ClearCache = function()
@@ -54,12 +55,17 @@ AssetManager.prototype.CancelDownloads = function()
 AssetManager.prototype.GetModel = function(id, callback)
 {
 	var m = this.modelCache.GetAsset(id);
-	if (m)
-	{
+	if (m) {
 		callback(m);
-	}
-	else
+	} else if(this.callOnDownload[id]) {
+        var oldCallback = this.callOnDownload[id];
+        this.callOnDownload[id] = function(model) {
+            oldCallback(model);
+            callback(model);
+        };
+    } else {
 		this.DownloadModel(id, callback);
+    }
 }
 
 AssetManager.prototype.GetTexture = function(url, callback)
@@ -193,11 +199,16 @@ AssetManager.prototype.DownloadModel = function(id, callback)
 		}
 		var model = new Model(id, components);
 		that.modelCache.AddAsset(id, model);
-		callback(model);
+		
+		// safely uninstall, and then call callback
+		var toCall = that.callOnDownload[id];
+		delete that.callOnDownload[id];
+		toCall(model);
 	}
 	
 	var download = getHttpRequest(Constants.modelDir + id + '.json', function(req, e) { jsonFileDownloaded(req); });
 	this.downloadingModels[id] = download;
+	this.callOnDownload[id] = callback;
 }
 
 AssetManager.prototype.DownloadTexture = function(url, callback)

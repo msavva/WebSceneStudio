@@ -4,6 +4,7 @@
 requirejs.config({
     baseUrl: '/javascripts',
 	paths: {
+		'async' : 'async.min',
 		'jquery' : 'jquery-ui/js/jquery-1.7.2.min',
 		'jquery-ui': 'jquery-ui/js/jquery-ui-1.8.21.custom.min',
 		'gl-matrix': 'gl-matrix-min'

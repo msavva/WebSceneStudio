@@ -58,7 +58,7 @@ SavedState.prototype.restore = function()
 	var app = this.app;
 	var scene = app.scene;
 	
-	scene.LoadFromSerialized(this.serializedScene, app.assman);
+	scene.LoadFromLocalSerialized(this.serializedScene, app.assman);
 	app.SelectInstance(scene.IndexToObject(this.selectedIndex));
 };
 
@@ -67,7 +67,7 @@ UndoStack.prototype.createSaveState = function(cmdType, targetModelIndex)
     var scene = this.app.scene;
 	var selectedInst = this.app.uistate.selectedInstance;
 	var selectedIndex = scene.ObjectToIndex(selectedInst);
-    return new SavedState(cmdType, targetModelIndex, this.app, scene.Serialize(), selectedIndex);
+    return new SavedState(cmdType, targetModelIndex, this.app, scene.SerializeForLocal(), selectedIndex);
 };
 
 UndoStack.prototype.undo = function()

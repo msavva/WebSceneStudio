@@ -20,6 +20,7 @@ reverseProxy.start();
 var solrProc = exec("python StartServer.py",
                     { cwd: './components/servers/solr'});
 solrProc.stdout.pipe(process.stdout, {end: false});
+console.log('Launching solr server on port ????');
 
 // Now, let's define the Express application...
 var app = express();
@@ -58,6 +59,10 @@ app.get('/scenes', access.gate('/welcome'), sceneRoutes.scenes);
 app.post('/newScene', access.gate('/welcome'), sceneRoutes.newScene);
 app.get('/scenes/:scene_name/edit', access.gate('/welcome'),
                                     sceneRoutes.editScene);
+app.get('/scenes/:scene_name/load', access.gate('/welcome'),
+                                    sceneRoutes.loadScene);
+app.post('/scenes/:scene_name/save', access.gate('/welcome'),
+                                     sceneRoutes.saveScene);
 
 // 404 error route
 // THIS IS A STUB.  Need a proper 404 response page.

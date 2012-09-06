@@ -12,32 +12,44 @@ function Toolbar(app)
 	this.elem = $('#toolbar');
 	this.buttons = {};
 	
-	this.AddButton('Undo', 'Undo (Ctrl + Z)', 'undo', function(event) {
-		this.app.Undo();
-	}.bind(this));
-	this.AddButton('Redo', 'Redo (Ctrl + Y)', 'redo', function(event) {
-		this.app.Redo();
-	}.bind(this));
+	this.AddButton('Undo', 'Undo (Ctrl + Z)',
+	               'undo', function(event) {
+		app.Undo();
+	});
+	this.AddButton('Redo', 'Redo (Ctrl + Y)',
+	               'redo', function(event) {
+		app.Redo();
+	});
 	
 	this.AddSpacer();
 	
-	this.AddButton('Copy', 'Copy selected model (Ctrl + C)', 'copy', function(event) {
-		this.app.Copy();
-	}.bind(this));
-	this.AddButton('Paste', 'Paste copied model (Ctrl + V)', 'paste', function(event) {
-		this.app.Paste();
-	}.bind(this));
-	this.AddButton('Delete', 'Delete selected model (Delete)', 'delete', function(event) {
-		this.app.Delete();
-	}.bind(this));
-	this.AddButton('Tumble', 'Tumble selected model (M)', 'tumble', function(event) {
-		this.app.Tumble(this.app.uistate.selectedInstance, true);
-	}.bind(this));
+	this.AddButton('Copy', 'Copy selected model (Ctrl + C)',
+	               'copy', function(event) {
+		app.Copy();
+	});
+	this.AddButton('Paste', 'Paste copied model (Ctrl + V)',
+	               'paste', function(event) {
+		app.Paste();
+	});
+	this.AddButton('Delete', 'Delete selected model (Delete)',
+	               'delete', function(event) {
+		app.Delete();
+	});
+	this.AddButton('Tumble', 'Tumble selected model (M)',
+	               'tumble', function(event) {
+		app.Tumble(this.app.uistate.selectedInstance, true);
+	});
 	
 	this.AddSpacer();
 	
-	this.AddButton('Save', 'Save scene (Ctrl + S)', 'save', function(event) {console.log('Not yet implemented');});
-	this.AddButton('Close', 'Close the editor', 'close', function(event) {console.log('Not yet implemented');});
+	this.AddButton('Save', 'Save scene (Ctrl + S)',
+	               'save', function(event) {
+	   app.SaveScene();
+    });
+	this.AddButton('Close', 'Close the editor',
+	               'close', function(event) {
+	   app.ExitTo('scenes/');
+    });
 	
 	// Disable buttons in the intial state
 	this.DisableButton('Undo');

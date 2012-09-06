@@ -59,26 +59,43 @@ ModelInstance.prototype.toJSONString = function()
     return JSON.stringify(this, ["index","modelID", "parentIndex", "renderStateArr", "cu", "cv", "cw", "parentMeshI", "parentTriI", "parentUV", "cubeFace", "scale", "rotation"]);
 };
 
-ModelInstance.fromJSONString = function(string, assman, modelMap)
+ModelInstance.fromJSONString = function(string, assman, modelMap, callback)
 {
     var json = JSON.parse(string);
-    var model = modelMap[json.modelID];
-    var newMinst = new ModelInstance(model, null);
-    newMinst.index = json.index;
-    newMinst.parentMeshI = json.parentMeshI;
-    newMinst.parentTriI = json.parentTriI;
-    newMinst.parentUV = new Float32Array(json.parentUV);
-    newMinst.cubeFace = json.cubeFace;
-    newMinst.scale = json.scale;
-    newMinst.rotation = json.rotation;
-    newMinst.renderState = {isPickable: json.renderStateArr[0], isInserting: json.renderStateArr[1], isSelected: json.renderStateArr[2], isSelectable: json.renderStateArr[3] };
-    newMinst.coordFrame = new CoordinateFrame(json.cu, json.cv, json.cw);
-
-    // Copy over parent index. Actual model will need to be re-instated at a later time
-    // by the logic that has requested deserialization
-    newMinst.parentIndex = json.parentIndex;
-
-    return newMinst;
+    
+    (function(remaining) {
+        if(modelMap) {
+            var model = modelMap[json.modelID];
+            remaining(model);
+        } else {
+            assman.GetModel(json.modelID, function(model) {
+                remaining(model);
+            }.bind(this));
+        }
+    })(function(model) {
+        var newMinst = new ModelInstance(model, null);
+        newMinst.index = json.index;
+        newMinst.parentMeshI = json.parentMeshI;
+        newMinst.parentTriI = json.parentTriI;
+        newMinst.parentUV = new Float32Array(json.parentUV);
+        newMinst.cubeFace = json.cubeFace;
+        newMinst.scale = json.scale;
+        newMinst.rotation = json.rotation;
+        newMinst.renderState = {
+            isPickable: json.renderStateArr[0],
+            isInserting: json.renderStateArr[1],
+            isSelected: json.renderStateArr[2],
+            isSelectable: json.renderStateArr[3]
+        };
+        newMinst.coordFrame = new CoordinateFrame(json.cu, json.cv, json.cw);
+    
+        // Copy over parent index.
+        // Actual model will need to be re-instated at a later time
+        // by the logic that has requested deserialization
+        newMinst.parentIndex = json.parentIndex;
+        
+        callback(newMinst);
+    });
 };
 
 ModelInstance.prototype.Clone = function()

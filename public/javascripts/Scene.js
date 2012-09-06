@@ -2,7 +2,8 @@
 
 define([
 	'ModelInstance',
-	'jquery'
+	'jquery',
+	'async'
 ],
 function(ModelInstance){
 
@@ -140,7 +141,7 @@ Scene.prototype.Pick = function(renderer)
 		this.manipulators[i].Pick(renderer, nummodels+i);
 };
 
-Scene.prototype.Serialize = function()
+Scene.prototype.SerializeForLocal = function()
 {
 	var packedModels = [];
     var modelMap = [];
@@ -151,33 +152,62 @@ Scene.prototype.Serialize = function()
 	return { packedModels: packedModels, modelMap: modelMap };
 };
 
-Scene.prototype.LoadFromSerialized = function(serializedScene, assman)
+Scene.prototype.LoadFromLocalSerialized =
+    function(serializedScene, assman, top_level_callback)
 {
+    top_level_callback = top_level_callback || function(){};
     this.Reset();
-
-	serializedScene.packedModels.forEach(function(packedModel){
-		var model = ModelInstance.fromJSONString(packedModel, assman, serializedScene.modelMap);
-		if (model.index === -1) // Root model
-        {
-            this.modelList[0] = model;
-        }
-        else
-        {
-            this.modelList[model.index] = model;
-        }
-	}.bind(this));
-
-	this.modelList.forEach(function(model){
-		if (model.parentIndex >= 0) model.SetParent(this.modelList[model.parentIndex]);
-		
-		model.UpdateTransform();
-		
-		delete model.parentIndex;
-	}.bind(this));
-	
-	this.root = this.modelList[0];
-	this.root.renderState.isSelectable = false;
+    
+    var getModelFromJSON = function(packedModel, callback) {
+        ModelInstance.fromJSONString(
+            packedModel,
+            assman,
+            serializedScene.modelMap,
+            function(model) {
+                if (model.index === -1) // Root model
+                {
+                    this.modelList[0] = model;
+                }
+                else
+                {
+                    this.modelList[model.index] = model;
+                }
+                callback(); // can report errors via this ...
+            }.bind(this)
+        );
+    }.bind(this);
+    
+    async.forEach(serializedScene.packedModels, getModelFromJSON,
+    function(err){
+        this.modelList.forEach(function(model){
+            if (model.parentIndex >= 0)
+                model.SetParent(this.modelList[model.parentIndex]);
+            
+            model.UpdateTransform();
+            
+            delete model.parentIndex;
+        }.bind(this));
+        
+        this.root = this.modelList[0];
+        this.root.renderState.isSelectable = false;
+        
+        top_level_callback(err); // pass the error along I guess?
+    }.bind(this));
 };
+
+Scene.prototype.SerializeForNetwork = function()
+{
+    var pair = this.SerializeForLocal();
+    return pair.packedModels;
+};
+
+Scene.prototype.LoadFromNetworkSerialized =
+    function(serialized, assman, callback)
+{
+    var pair = { packedModels: serialized };
+    this.LoadFromLocalSerialized(pair, assman, callback);
+};
+
 
 // Exports
 return Scene;

@@ -55,6 +55,11 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		
         this.canvas = canvas;
         
+        // the following variables from globalViewData
+        // should be rendered by the jade template
+        this.scene_name = window.globalViewData.scene_name;
+        this.close_url  = window.globalViewData.close_url;
+        
         this.uimap = uimap.create(canvas);
 
         this.camera = new Camera();
@@ -92,12 +97,20 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 	
     App.prototype.Launch = function ()
     {
-        this.assman.GetModel('room', function (model)
-        {
-            this.scene.Reset(new ModelInstance(model, null));
+        this.LoadScene(this.scene_name,
+        function() { // on failure create an empty room
+            this.assman.GetModel('room', function (model)
+            {
+                this.scene.Reset(new ModelInstance(model, null));
+                this.undoStack.clear();
+                this.renderer.postRedisplay();
+            } .bind(this));
+        }.bind(this),
+        function() { // on success finish up some setup
             this.undoStack.clear();
             this.renderer.postRedisplay();
-        } .bind(this));
+        }.bind(this));
+        
 		this.renderer.resizeEnd();
         this.UpdateView();
     };
@@ -437,6 +450,48 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 		doRecordUndoEvent && this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SWITCHFACE, mInst);
 		this.renderer.postRedisplay();	
 	}
+	
+	App.prototype.LoadScene = function(scene_name, on_failure, on_success)
+	{
+        $.get('/scenes/' + this.scene_name + '/load')
+        .error(function() {
+            on_failure();
+        }.bind(this)).success(function(scene_json) {
+            scene_json = JSON.parse(scene_json);
+            this.scene.LoadFromNetworkSerialized(scene_json,
+                                                 this.assman,
+                                                 on_success);
+        }.bind(this));
+	}
+	
+	App.prototype.SaveScene = function(on_success, on_error)
+	{
+        on_success = on_success || function() {
+            alert('saved!  Please develop a better UI alert');
+        };
+        on_error = on_error || function() {
+            alert('did not save!  Please develop a better UI alert');
+        };
+        var serialized = this.scene.SerializeForNetwork();
+        $.ajax({
+            type: 'POST',
+            url: '/scenes/' + this.scene_name + '/save',
+            data: {
+                scene_file: JSON.stringify(serialized),
+            },
+            dataType: 'json',
+            timeout: 10000,
+        }).error(on_error).success(on_success);
+	}
+    
+    App.prototype.ExitTo = function(destination)
+    {
+        this.SaveScene(function() {
+            window.onbeforeunload = null;
+            window.location.href = this.close_url;
+        }.bind(this)); // should add dialog to ask if the user wants to leave
+        // even though nothing was saved in event of error
+    }
 
     App.prototype.ToggleSuppressPickingOnSelectedInstance = function (toggle)
     {

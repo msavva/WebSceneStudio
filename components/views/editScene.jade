@@ -25,4 +25,12 @@ html
   include glsl/picking.vert.jade
   include glsl/picking.frag.jade
   
+  //- We pack globalViewData with any render-specific information
+  //- that we would like the App to be able to access.
+  script(type='text/javascript')
+    window.globalViewData = {
+        scene_name: "#{scene.name}",
+        close_url: "#{close_url}",
+    };
+  
   script(data-main="/javascripts/main", src="/javascripts/require.js")
