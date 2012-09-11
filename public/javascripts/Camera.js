@@ -20,45 +20,47 @@ function Camera(eye, lookAt, up)
 	this.savedState = null;
 }
 
-Camera.prototype.CalculateYaw = function()
+Camera.prototype.CalculatePitchYaw = function()
 {
-	// Project forward into the xy plane
-	var tmp = vec3.create(this.lookVec);
-	tmp[2] = 0;
+	var worldZ = vec3.create([0, 0, 1]);
 	
-	// Find angle between forward and world y
-	return vec3.signedAngleBetween([0, 1, 0], tmp, [0, 0, 1]);
+	// Pitch
+	var axis = vec3.create();
+    vec3.cross(worldZ, this.upVec, axis);
+	var pitch = vec3.signedAngleBetween(worldZ, this.upVec, axis);
+	
+	// Transform lookVec by the matrix that aligns up with world z.
+	// Yaw is the angle between this vector and world y.
+	var xform = mat4.identity(mat4.create());
+	mat4.face(this.upVec, worldZ, xform);
+	var rotLookVec = vec3.create();
+	mat4.multiplyVec3(xform, this.lookVec, rotLookVec);
+	var yaw = vec3.signedAngleBetween([0, 1, 0], rotLookVec, worldZ);
+	
+	return [pitch, yaw];
 }
 
-Camera.prototype.CalculatePitch = function()
+Camera.prototype.State = function()
 {
-	// Project forward into the yz plane
-	var tmp = vec3.create(this.lookVec);
-	tmp[0] = 0;
-	
-	// Find angle between forward and world y
-	return vec3.signedAngleBetween([0, 1, 0], tmp, [1, 0, 0]);
-}
-
-Camera.prototype.CalculatePitch = function()
-{
-	//
+	var state = {};
+	state.eyePos = vec3.create(this.eyePos);
+	state.lookAtPoint = vec3.create(this.lookAtPoint);
+	var py = this.CalculatePitchYaw();
+	state.pitch = py[0];
+	state.yaw = py[1];
+	return state;
 }
 
 Camera.prototype.SaveStateForReset = function()
 {
-	if (!this.savedState)
-		this.savedState = {};
-	this.savedState.eyePos = vec3.create(this.eyePos);
-	this.savedState.lookAtPoint = vec3.create(this.lookAtPoint);
-	this.savedState.upVec = vec3.create(this.upVec);
+	this.savedState = this.State();
 }
 
 Camera.prototype.ResetSavedState = function()
 {
 	if (this.savedState)
 	{
-		this.Reset(this.savedState.eyePos, this.savedState.lookAtPoint, this.savedState.upVec);
+		this.ResetFromPitchYaw(this.savedState.eyePos, this.savedState.lookAtPoint, this.savedState.pitch, this.savedState.yaw);
 	}
 }
 
@@ -88,6 +90,16 @@ Camera.prototype.Reset = function(eye, lookAt, up)
 	vec3.cross(this.upVec, this.lookVec, this.leftVec);
 	
 	vec3.cross(this.lookVec, this.leftVec, this.upVec);
+}
+
+// In this version, the arguments are *NOT* optional
+Camera.prototype.ResetFromPitchYaw = function(eye, lookAt, pitch, yaw)
+{
+	this.Reset();
+	this.PanUp(pitch);
+	this.PanLeft(yaw);
+	vec3.set(eye, this.eyePos);
+	vec3.set(lookAt, this.lookAtPoint);
 }
 
 Camera.prototype.LookAtMatrix = function()

@@ -12,6 +12,14 @@ vec3.sphericalCoords = function(src, dst)
 	dst[2] = Math.atan2(src[1], src[0]);
 }
 
+vec3.sphericalToRectangular = function(r, phi, theta, dst)
+{
+	var rSinTheta = r*Math.sin(theta);
+	dst[0] = rSinTheta*Math.cos(phi);
+	dst[1] = rSinTheta*Math.sin(phi);
+	dst[2] = r*Math.cos(theta);
+}
+
 mat4.createFromRows = function(v0, v1, v2, v3)
 {
 	var args = [];

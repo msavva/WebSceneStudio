@@ -35,7 +35,7 @@ Constants.cameraWidgetZoomAmt = 30;
 Constants.cameraWidgetOrbitDuration = 250;
 Constants.cameraWidgetDollyDuration = 250;
 Constants.cameraWidgetZoomDuration = 250;
-Constants.cameraWidgetResetDuration = 1000;
+Constants.cameraWidgetResetDuration = 750;
 
 // Perspective settings
 Constants.fovy = 60.0;

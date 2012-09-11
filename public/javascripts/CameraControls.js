@@ -288,9 +288,9 @@ function makeHomeButton(app)
 				.click(function(event) {
 					//app.camera.ResetSavedState();
 					//app.UpdateView();
-					animate(app.camera, app.camera.savedState, Constants.cameraWidgetResetDuration, quadraticEaseInOutCameraStateInterpolator,
+					animate(app.camera.State(), app.camera.savedState, Constants.cameraWidgetResetDuration, quadraticEaseInOutCameraStateInterpolator,
 						function(prevVal, currVal) {
-							app.camera.Reset(currVal.eyePos, currVal.lookAtPoint, currVal.upVec);
+							app.camera.ResetFromPitchYaw(currVal.eyePos, currVal.lookAtPoint, currVal.pitch, currVal.yaw);
 							app.UpdateView();
 						})
 				});
@@ -368,7 +368,8 @@ function quadraticEaseInOutCameraStateInterpolator(t, start, end)
 	var result = {};
 	result.eyePos = quadraticEaseInOutVec3Interpolator(t, start.eyePos, end.eyePos);
 	result.lookAtPoint = quadraticEaseInOutVec3Interpolator(t, start.lookAtPoint, end.lookAtPoint);
-	result.upVec = quadraticEaseInOutVec3Interpolator(t, start.upVec, end.upVec);
+	result.pitch = quadraticEaseInOutScalarInterpolator(t, start.pitch, end.pitch);
+	result.yaw = quadraticEaseInOutScalarInterpolator(t, start.yaw, end.yaw);
 	return result;
 }
 
