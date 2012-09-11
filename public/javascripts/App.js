@@ -12,13 +12,14 @@ define([
 	'Manipulators',
     'UndoStack',
 	'Toolbar',
+	'CameraControls',
 	'PubSub',
 	'SplitView',
 	'uimap',
 	'jquery'
 ],
 function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, SearchController,
-		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, PubSub, SplitView, uimap)
+		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, CameraControls, PubSub, SplitView, uimap)
 {
     // support function should be factored out...?
     function mapTable(table, perField) {
@@ -80,6 +81,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
 		this.undoStack = new UndoStack.UndoStack(this, Constants.undoStackMaxSize);
 		this.toolbar = new Toolbar(this);
+		this.cameraControls = new CameraControls(this);
         this.searchController = new SearchController(this);
         this.architectureGenerator = new ArchitectureGenerator(this);
 		

@@ -12,7 +12,7 @@ Constants.modelDir= '/data/model/';
 Constants.geomDir= '/data/geometry/';
 Constants.textureDir = '/data/texture/';
 Constants.imageDir = '/data/image/';
-Constants.resourceDir = '/javascripts/resources/';
+Constants.resourceDir = '/images/';
 
 // Shader locations
 Constants.modelVertShaderSource = id('model.vert').text;

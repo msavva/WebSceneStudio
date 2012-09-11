@@ -12,6 +12,8 @@ html
       #graphicsOverlay
         toolbar#toolbar(oncontextmenu="$('#canvas').focus(); return false;",
                       onclick="$('#canvas').focus();")
+        cameraControls#cameraControls(oncontextmenu="$('#canvas').focus(); return false;",
+                      onclick="$('#canvas').focus();")
       #searchArea
         h3#searchInputHeader Model Search
         input(type="text", id="searchInputBox")
