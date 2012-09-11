@@ -21,16 +21,16 @@ function CameraControls(app)
 	container.append(controlPanel);
 	
 	// Orbit control
-	controlPanel.append(makeOrbitControl());
+	controlPanel.append(makeOrbitControl(app));
 	
 	// Move control
-	controlPanel.append(makeMoveControl());
+	controlPanel.append(makeMoveControl(app));
 	
 	// Zoom control
-	controlPanel.append(makeZoomControl());
+	controlPanel.append(makeZoomControl(app));
 	
 	// Home button
-	controlPanel.append(makeHomeButton());
+	controlPanel.append(makeHomeButton(app));
 	
 	
 	// Initially hide the controls
@@ -83,19 +83,61 @@ function makeCameraButton()
 	return button;
 }
 
-function makeOrbitControl()
+function makeOrbitControl(app)
 {	
-	return makeDpadControl('orbitControl', Constants.resourceDir + 'camera_icons/orbit.png', 'Orbit camera (Right mouse drag)',
-						   null, null, null, null);
+	return makeDpadControl(app, 'orbitControl', Constants.resourceDir + 'camera_icons/orbit.png', 'Orbit camera (Right mouse drag)',
+						   {
+								'left' : function(event)
+								{
+									app.camera.OrbitLeft(-Constants.cameraWidgetOrbitLeftAmt);
+									app.UpdateView();
+								},
+								'right' : function(event)
+								{
+									app.camera.OrbitLeft(Constants.cameraWidgetOrbitLeftAmt);
+									app.UpdateView();
+								},
+								'up' : function(event)
+								{
+									app.camera.OrbitUp(Constants.cameraWidgetOrbitUpAmt);
+									app.UpdateView();
+								},
+								'down' : function(event)
+								{
+									app.camera.OrbitUp(-Constants.cameraWidgetOrbitUpAmt);
+									app.UpdateView();
+								}
+						   });
 }
 
-function makeMoveControl()
+function makeMoveControl(app)
 {
-	return makeDpadControl('moveControl', Constants.resourceDir + 'camera_icons/move.png', 'Dolly camera (Middle mouse drag)',
-						   null, null, null, null);
+	return makeDpadControl(app, 'moveControl', Constants.resourceDir + 'camera_icons/move.png', 'Dolly camera (Middle mouse drag)',
+						   {
+								'left' : function(event)
+								{
+									app.camera.DollyLeft(Constants.cameraWidgetDollyAmt);
+									app.UpdateView();
+								},
+								'right' : function(event)
+								{
+									app.camera.DollyLeft(-Constants.cameraWidgetDollyAmt);
+									app.UpdateView();
+								},
+								'up' : function(event)
+								{
+									app.camera.DollyUp(Constants.cameraWidgetDollyAmt);
+									app.UpdateView();
+								},
+								'down' : function(event)
+								{
+									app.camera.DollyUp(-Constants.cameraWidgetDollyAmt);
+									app.UpdateView();
+								}
+						   });
 }
 
-function makeDpadControl(id, iconUrl, tooltip, leftCallback, rightCallback, upCallback, downCallback)
+function makeDpadControl(app, id, iconUrl, tooltip, callbacks)
 {
 	var container = $('<div></div>')
 					.attr('id', id)
@@ -122,7 +164,7 @@ function makeDpadControl(id, iconUrl, tooltip, leftCallback, rightCallback, upCa
 		.addClass('cameraControlsButton')
 		.addClass('dpadButton')
 		.addClass('dpadLeftButton')
-		.click(leftCallback)
+		.click(callbacks && callbacks.left)
 	);
 	
 	// Right button
@@ -132,7 +174,7 @@ function makeDpadControl(id, iconUrl, tooltip, leftCallback, rightCallback, upCa
 		.addClass('cameraControlsButton')
 		.addClass('dpadButton')
 		.addClass('dpadRightButton')
-		.click(rightCallback)
+		.click(callbacks && callbacks.right)
 	);
 	
 	// Up button
@@ -142,7 +184,7 @@ function makeDpadControl(id, iconUrl, tooltip, leftCallback, rightCallback, upCa
 		.addClass('cameraControlsButton')
 		.addClass('dpadButton')
 		.addClass('dpadUpButton')
-		.click(upCallback)
+		.click(callbacks && callbacks.up)
 	);
 	
 	// Down button
@@ -152,13 +194,13 @@ function makeDpadControl(id, iconUrl, tooltip, leftCallback, rightCallback, upCa
 		.addClass('cameraControlsButton')
 		.addClass('dpadButton')
 		.addClass('dpadDownButton')
-		.click(downCallback)
+		.click(callbacks && callbacks.down)
 	);
 	
 	return container;
 }
 
-function makeZoomControl()
+function makeZoomControl(app)
 {
 	var container = $('<div></div>').attr('id', 'zoomControl');
 	
@@ -181,6 +223,10 @@ function makeZoomControl()
 		.attr('id', 'zoomMinusButton')
 		.addClass('cameraControlsButton')
 		.addClass('zoomButton')
+		.click(function(event) {
+			app.camera.Zoom(-Constants.cameraWidgetZoomAmt);
+			app.UpdateView();
+		})
 	);
 	
 	// Plus button
@@ -189,12 +235,16 @@ function makeZoomControl()
 		.attr('id', 'zoomPlusButton')
 		.addClass('cameraControlsButton')
 		.addClass('zoomButton')
+		.click(function(event) {
+			app.camera.Zoom(Constants.cameraWidgetZoomAmt);
+			app.UpdateView();
+		})
 	);
 	
 	return container;
 }
 
-function makeHomeButton()
+function makeHomeButton(app)
 {
 	var iconURL = Constants.resourceDir + 'camera_icons/home';
 	var button =  $('<img></img>')
@@ -202,7 +252,11 @@ function makeHomeButton()
 				.attr('id', 'homeButton')
 				.attr('title', 'Reset camera')
 				.addClass('cameraControlsButton')
-				.bind('dragstart', NoDrag);
+				.bind('dragstart', NoDrag)
+				.click(function(event) {
+					app.camera.ResetSavedState();
+					app.UpdateView();
+				});
 	makeImageButtonHighlightCorrectly(button, iconURL);
 	return button;
 }

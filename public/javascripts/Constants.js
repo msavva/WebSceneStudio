@@ -27,6 +27,12 @@ Constants.cameraDollySpeed = 0.15;
 Constants.cameraOrbitSpeed = 0.0025;
 Constants.cameraZoomSpeed = 0.08;
 
+// Camera widget settings
+Constants.cameraWidgetOrbitLeftAmt = Math.PI / 8;
+Constants.cameraWidgetOrbitUpAmt = Math.PI / 12;
+Constants.cameraWidgetDollyAmt = 20;
+Constants.cameraWidgetZoomAmt = 30;
+
 // Perspective settings
 Constants.fovy = 60.0;
 Constants.zNear = 2.0;

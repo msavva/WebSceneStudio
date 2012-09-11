@@ -2,7 +2,8 @@
 
 define([
 	'Ray',
-	'gl-matrix'
+	'gl-matrix',
+	'jquery'
 ],
 function(Ray){
 
@@ -14,6 +15,23 @@ function Camera(eye, lookAt, up)
 	this.lookVec = vec3.create();
 	this.leftVec = vec3.create();
 	this.Reset(eye, lookAt, up);
+	
+	this.savedState = null;
+}
+
+Camera.prototype.SaveStateForReset = function()
+{
+	this.savedState = $.extend(true, {}, this);
+}
+
+Camera.prototype.ResetSavedState = function()
+{
+	if (this.savedState)
+	{
+		var savedState = this.savedState;
+		$.extend(true, this, savedState);
+		this.savedState = savedState;
+	}
 }
 
 Camera.prototype.Reset = function(eye, lookAt, up)
