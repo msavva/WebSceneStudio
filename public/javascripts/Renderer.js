@@ -14,13 +14,20 @@ define([
 function(Constants, Shader, Program, Mesh, Picker){
 
 function createContextFromCanvas(canvas) {
-  var context = canvas.getContext('experimental-webgl', {preserveDrawingBuffer: true});
-  // Automatically use debug wrapper context, if available.
-  return typeof WebGLDebugUtils !== 'undefined' ? 
+    var context = canvas.getContext('experimental-webgl', {preserveDrawingBuffer: true});
+
+    // Rudimentary WebGL compliance checking. TODO: Implement as part of notification system
+    if (!context) document.body.innerHTML = [
+      'Your graphics card does not seem to support <a href="http://khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" style="color:#000">WebGL</a>.<br />',
+      'Find out how to get it <a href="http://get.webgl.org/" style="color:#000">here</a>.'
+    ].join( '\n' );
+
+    // Automatically use debug wrapper context, if available.
+    return typeof WebGLDebugUtils !== 'undefined' ?
     WebGLDebugUtils.makeDebugContext(context, function(err, funcName, args) {
       throw WebGLDebugUtils.glEnumToString(err) + " by " + funcName;
     }) : context;
-};
+}
 
 function Renderer(canvas, scene) {
   var self = this;
