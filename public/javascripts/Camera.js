@@ -3,6 +3,7 @@
 define([
 	'Ray',
 	'gl-matrix',
+	'gl-matrix-ext',
 	'jquery'
 ],
 function(Ray){
@@ -19,18 +20,45 @@ function Camera(eye, lookAt, up)
 	this.savedState = null;
 }
 
+Camera.prototype.CalculateYaw = function()
+{
+	// Project forward into the xy plane
+	var tmp = vec3.create(this.lookVec);
+	tmp[2] = 0;
+	
+	// Find angle between forward and world y
+	return vec3.signedAngleBetween([0, 1, 0], tmp, [0, 0, 1]);
+}
+
+Camera.prototype.CalculatePitch = function()
+{
+	// Project forward into the yz plane
+	var tmp = vec3.create(this.lookVec);
+	tmp[0] = 0;
+	
+	// Find angle between forward and world y
+	return vec3.signedAngleBetween([0, 1, 0], tmp, [1, 0, 0]);
+}
+
+Camera.prototype.CalculatePitch = function()
+{
+	//
+}
+
 Camera.prototype.SaveStateForReset = function()
 {
-	this.savedState = $.extend(true, {}, this);
+	if (!this.savedState)
+		this.savedState = {};
+	this.savedState.eyePos = vec3.create(this.eyePos);
+	this.savedState.lookAtPoint = vec3.create(this.lookAtPoint);
+	this.savedState.upVec = vec3.create(this.upVec);
 }
 
 Camera.prototype.ResetSavedState = function()
 {
 	if (this.savedState)
 	{
-		var savedState = this.savedState;
-		$.extend(true, this, savedState);
-		this.savedState = savedState;
+		this.Reset(this.savedState.eyePos, this.savedState.lookAtPoint, this.savedState.upVec);
 	}
 }
 

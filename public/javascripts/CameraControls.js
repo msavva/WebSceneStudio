@@ -2,7 +2,9 @@
 
 define([
 	'Constants',
-	'jquery'
+	'jquery',
+	'base',
+	'gl-matrix'
 ],
 function(Constants){
 	
@@ -89,23 +91,35 @@ function makeOrbitControl(app)
 						   {
 								'left' : function(event)
 								{
-									app.camera.OrbitLeft(-Constants.cameraWidgetOrbitLeftAmt);
-									app.UpdateView();
+									animate(0, -Constants.cameraWidgetOrbitLeftAmt, Constants.cameraWidgetOrbitDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.OrbitLeft(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'right' : function(event)
 								{
-									app.camera.OrbitLeft(Constants.cameraWidgetOrbitLeftAmt);
-									app.UpdateView();
+									animate(0, Constants.cameraWidgetOrbitLeftAmt, Constants.cameraWidgetOrbitDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.OrbitLeft(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'up' : function(event)
 								{
-									app.camera.OrbitUp(Constants.cameraWidgetOrbitUpAmt);
-									app.UpdateView();
+									animate(0, Constants.cameraWidgetOrbitUpAmt, Constants.cameraWidgetOrbitDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.OrbitUp(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'down' : function(event)
 								{
-									app.camera.OrbitUp(-Constants.cameraWidgetOrbitUpAmt);
-									app.UpdateView();
+									animate(0, -Constants.cameraWidgetOrbitUpAmt, Constants.cameraWidgetOrbitDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.OrbitUp(currVal-prevVal);
+												app.UpdateView();
+											})
 								}
 						   });
 }
@@ -116,23 +130,35 @@ function makeMoveControl(app)
 						   {
 								'left' : function(event)
 								{
-									app.camera.DollyLeft(Constants.cameraWidgetDollyAmt);
-									app.UpdateView();
+									animate(0, Constants.cameraWidgetDollyAmt, Constants.cameraWidgetDollyDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.DollyLeft(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'right' : function(event)
 								{
-									app.camera.DollyLeft(-Constants.cameraWidgetDollyAmt);
-									app.UpdateView();
+									animate(0, -Constants.cameraWidgetDollyAmt, Constants.cameraWidgetDollyDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.DollyLeft(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'up' : function(event)
 								{
-									app.camera.DollyUp(Constants.cameraWidgetDollyAmt);
-									app.UpdateView();
+									animate(0, Constants.cameraWidgetDollyAmt, Constants.cameraWidgetDollyDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.DollyUp(currVal-prevVal);
+												app.UpdateView();
+											})
 								},
 								'down' : function(event)
 								{
-									app.camera.DollyUp(-Constants.cameraWidgetDollyAmt);
-									app.UpdateView();
+									animate(0, -Constants.cameraWidgetDollyAmt, Constants.cameraWidgetDollyDuration, quadraticEaseInOutScalarInterpolator,
+											function(prevVal, currVal) {
+												app.camera.DollyUp(currVal-prevVal);
+												app.UpdateView();
+											})
 								}
 						   });
 }
@@ -224,8 +250,11 @@ function makeZoomControl(app)
 		.addClass('cameraControlsButton')
 		.addClass('zoomButton')
 		.click(function(event) {
-			app.camera.Zoom(-Constants.cameraWidgetZoomAmt);
-			app.UpdateView();
+			animate(0, -Constants.cameraWidgetZoomAmt, Constants.cameraWidgetZoomDuration, quadraticEaseInOutScalarInterpolator,
+					function(prevVal, currVal) {
+						app.camera.Zoom(currVal-prevVal);
+						app.UpdateView();
+					})
 		})
 	);
 	
@@ -236,8 +265,11 @@ function makeZoomControl(app)
 		.addClass('cameraControlsButton')
 		.addClass('zoomButton')
 		.click(function(event) {
-			app.camera.Zoom(Constants.cameraWidgetZoomAmt);
-			app.UpdateView();
+			animate(0, Constants.cameraWidgetZoomAmt, Constants.cameraWidgetZoomDuration, quadraticEaseInOutScalarInterpolator,
+					function(prevVal, currVal) {
+						app.camera.Zoom(currVal-prevVal);
+						app.UpdateView();
+					})
 		})
 	);
 	
@@ -254,11 +286,90 @@ function makeHomeButton(app)
 				.addClass('cameraControlsButton')
 				.bind('dragstart', NoDrag)
 				.click(function(event) {
-					app.camera.ResetSavedState();
-					app.UpdateView();
+					//app.camera.ResetSavedState();
+					//app.UpdateView();
+					animate(app.camera, app.camera.savedState, Constants.cameraWidgetResetDuration, quadraticEaseInOutCameraStateInterpolator,
+						function(prevVal, currVal) {
+							app.camera.Reset(currVal.eyePos, currVal.lookAtPoint, currVal.upVec);
+							app.UpdateView();
+						})
 				});
 	makeImageButtonHighlightCorrectly(button, iconURL);
 	return button;
+}
+
+/**
+ * startVal: value to start the animation at
+ * endVal: value to end the animation at
+ * duration: how long (in milliseconds) the animation should last
+ * interpolator: function(start, end, t) that interpolates the start and end
+ *    values given a percentage of duration elapsed thus far
+ * valueHandler: function(prevVal, currVal) that processes the difference in value
+ *    that accumulates over a time step. This function generates the state
+ *    changes that cause visual changes (i.e. changing camera state)
+ **/
+function animate(startVal, endVal, duration, interpolator, valueHandler)
+{
+	var startTime = Date.now();
+	var prevVal = interpolator(0, startVal, endVal);
+	
+	function animStep()
+	{
+		var currTime = Date.now();
+		var t = (currTime - startTime) / duration;
+		var last = t > 1;
+		if (last)
+			t = 1;
+		var currVal = interpolator(t, startVal, endVal);
+		valueHandler(prevVal, currVal);
+		prevVal = currVal;
+		if (!last)
+			window.requestAnimFrame(animStep);
+	}
+	
+	window.requestAnimFrame(animStep);
+}
+
+// Adapted from http://gizma.com/easing/
+function quadraticEaseInOutScalarInterpolator(t, start, end)
+{
+	var b = start;
+	var c = end - start;
+	var d = 1.0;
+	t /= d/2;
+	if (t < 1) return c/2*t*t + b;
+	t--;
+	return -c/2 * (t*(t-2) - 1) + b;
+};
+
+function quadraticEaseInOutVec3Interpolator(t, start, end)
+{
+	var b = start;
+	var c = vec3.create(); vec3.subtract(end, start, c);
+	var d = 1.0;
+	t /= d/2;
+	var tmp = vec3.create();
+	if (t < 1)
+	{
+		vec3.scale(c, t*t/2, tmp);
+		vec3.add(tmp, b, tmp);
+	}
+	else
+	{
+		t--;
+		vec3.scale(c, -(t*(t-2) - 1)/2, tmp);
+		vec3.add(tmp, b, tmp);
+	}
+	return tmp;
+}
+
+function quadraticEaseInOutCameraStateInterpolator(t, start, end)
+{
+	var result = {};
+	result.eyePos = quadraticEaseInOutVec3Interpolator(t, start.eyePos, end.eyePos);
+	result.lookAtPoint = quadraticEaseInOutVec3Interpolator(t, start.lookAtPoint, end.lookAtPoint);
+	result.upVec = quadraticEaseInOutVec3Interpolator(t, start.upVec, end.upVec);
+	return result;
 }
 
 
