@@ -8,5 +8,6 @@ components/servers/solr/tmp_agg.json
 public/stylesheets/style.css
 
 node_modules/
+node_modules/*
 
 /tools/numMatsHist.csv
