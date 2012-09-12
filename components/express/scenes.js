@@ -29,15 +29,14 @@ function getSceneNamed(scene_name) {
     return undefined;
 }
 
-// TODO: Also validate on user side
+var Validator = require('../../public/javascripts/shared/Validator');
 function validateSceneName(scene_name) {
     if(typeof scene_name !== 'string') // must type correctly
         return false;
     if(scene_name.length <= 0)  // empty string disallowed
         return false;
-    // TODO: Need to decide on a good way to do this
-    // white/blacklist characters or whole strings here
-    return true;
+
+    return Validator.alphaNumPlus(scene_name);
 }
 
 function createNewScene(scene_name) {
