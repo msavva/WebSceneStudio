@@ -132,6 +132,11 @@ ModelInstance.prototype.Remove = function()
 	this.SetParent(null);
 };
 
+ModelInstance.prototype.Bounds = function()
+{
+	return this.model.bbox.Transform(this.transform);
+}
+
 ModelInstance.prototype.CascadingRotate = function (rotate)
 {
 	this.rotation += rotate;

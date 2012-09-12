@@ -1,12 +1,13 @@
 'use strict';
 
 define([
+	'Constants',
 	'Ray',
 	'gl-matrix',
 	'gl-matrix-ext',
 	'jquery'
 ],
-function(Ray){
+function(Constants, Ray){
 
 function Camera(eye, lookAt, up)
 {
@@ -18,6 +19,12 @@ function Camera(eye, lookAt, up)
 	this.Reset(eye, lookAt, up);
 	
 	this.savedState = null;
+	this.sceneBounds = null;
+}
+
+Camera.prototype.UpdateSceneBounds = function(bbox)
+{
+	this.sceneBounds = bbox;
 }
 
 Camera.prototype.CalculatePitchYaw = function()
@@ -204,7 +211,23 @@ Camera.prototype.Zoom = function(dist)
 	
 	// Have to keep the look at point in front of the eye at all times.
 	if (vec3.dot(lookdir, oldlookdir) < 0)
-		vec3.add(this.lookAtPoint, offset)
+		vec3.add(this.lookAtPoint, offset);
+		
+	// Make sure that the camera is no farther than Constants.zFar from the farthest
+	// point in the scene (to avoid showing clipping artifacts to the user)
+	var c = this.sceneBounds.Centroid();
+	var r = this.sceneBounds.Radius();
+	var farpoint = vec3.create(); vec3.scale(this.lookVec, r, farpoint); vec3.add(farpoint, c);
+	var farDist = vec3.dist(farpoint, this.eyePos);
+	var look2eye = vec3.create(); vec3.subtract(this.eyePos, this.lookAtPoint, look2eye);
+	var lookDist = vec3.length(look2eye);
+	var fixedDist = farDist - lookDist;
+	if (farDist > Constants.zFar)
+	{
+		var newLookDist = Constants.zFar - fixedDist;
+		vec3.scale(look2eye, newLookDist/lookDist);
+		vec3.add(this.lookAtPoint, look2eye, this.eyePos);
+	}
 }
 
 Camera.prototype.TrackTo = function(newPos)

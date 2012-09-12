@@ -2,10 +2,11 @@
 
 define([
 	'ModelInstance',
+	'BBox',
 	'jquery',
 	'async'
 ],
-function(ModelInstance){
+function(ModelInstance, BBox){
 
 function Scene()
 {
@@ -27,6 +28,15 @@ Scene.prototype.Reset = function (root)
         this.root.renderState.isSelectable = false;
     }
 };
+
+Scene.prototype.Bounds = function()
+{
+	var bbox = new BBox();
+	bbox.FromBBox(this.modelList[0].Bounds());
+	for (var i = 1; i < this.modelList.length; i++)
+		bbox.ExpandBBox(this.modelList[i].Bounds());
+	return bbox;
+}
 
 Scene.prototype.AddManipulator = function (manip)
 {
