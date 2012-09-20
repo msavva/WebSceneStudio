@@ -64,46 +64,11 @@ TODO: explain any maintenance scripts here
 Development
 --------------
 
-###Database Migrations
+###Database
 
-While developing on the project, there's a good chance that you'll want to
-change something about the current database schema.  BEWARE! Mucking around
-with the database incorrectly can end up destroying precious data
-that you've collected.  In order to prevent such catastrophe and ease the
-development of changes to the database, we're using a very lightweight
-migration system.
-
-The database migration system consists of
-* a directory of migration scripts `components/database/migrations`
-* a tool `tools/db/migrate`
-* and a set of best practices detailed below.
-
-To make a modification to the database schema,
-1. Create a new migration script.  To do this run
-
-        tools/db/migrate create short_migration_name
-
-   This will create a migration script `###-short_migration_name.js` in the
-   `components/database/migrations` directory.
-
-2. Fill out the `up` and `down` stubs in this file.  The `down` function
-   should always undo the effects of the `up` function.
-
-3. To run this script (and any other un-run migration scripts) run
-
-        tools/db/migrate up
-
-__NEVER__
-* delete or modify a checked-in migration script
-* ...
-
-__ALWAYS__
-* make sure you back up any database with important data before you apply any
-  migrations to it.
-
-For more details on using the `migrate` tool, please see the project page:
-https://github.com/visionmedia/node-migrate
-
+See [`components/migrations/README.md`](components/migrations) for 
+ information on how to use the database code, how to make changes to
+the schema, and why the schema is set up the way it is.
 
 Structure of Project
 --------------

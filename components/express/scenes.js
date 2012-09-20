@@ -67,7 +67,7 @@ function saveScene(scene_name, scene_data) {
 
 exports.scenes = function(req, res) {
     var db = dbwrapper.db(); //db.verbose = false;
-    db.getUsersSceneList(req.session.user_id, function(err, scene_list) {
+    db.getUserSceneList(req.session.user_id, function(err, scene_list) {
         db.close();
         if(err) {
             console.log(err); // send a proper error response???

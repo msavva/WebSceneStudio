@@ -51,7 +51,7 @@ exports.getScene = function(user_id, scenename, callback)
     });
 }
 
-exports.getUsersSceneList = function(user_id, callback) {
+exports.getUserSceneList = function(user_id, callback) {
     this.execute(
     'SELECT '+
     '   SCN.scene_id AS id, '+
