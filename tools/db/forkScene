@@ -1,0 +1,50 @@
+#! /usr/bin/env node
+
+'use-strict';
+
+var rootdir     = process.env.SCENE_STUDIO_ROOT;
+
+var dbdir       = rootdir + '/components/database';
+
+var dbwrite     = require(dbdir + '/dbwrite');
+var queries     = require(dbdir + '/queries');
+var dbwrapper   = require(dbdir + '/dbwrapper')();
+    dbwrapper.mixin(dbwrite).mixin(queries);
+
+var async       = require('async');
+
+
+// get the user name from the command line arguments
+if(process.argv.length <= 5) {
+    console.log('USAGE: ');
+    console.log(" >  ./tools/db/newScene 'orig_user_name' 'orig_scene_name'\n"+
+                "                        'user_name' 'new_scene_name'");
+    process.exit(0);
+}
+var orig_username = process.argv[2];
+var orig_scenename = process.argv[3];
+var username = process.argv[4];
+var new_scenename = process.argv[5];
+
+// now issue the database command and inform the user
+// of the success or failure of the command
+var db = dbwrapper.db();
+db.verbose = true;
+var user_id = null;
+async.waterfall([
+async.apply(db.forkScene.bind(db), {
+        original_user_name:     orig_username,
+        original_scene_name:    orig_scenename,
+        scene_name:             new_scenename,
+        user_name:              username,
+}),
+function(contWaterfall) {
+    console.log('forked scene');
+    contWaterfall(null);
+},
+], function(err) {
+    db.close();
+    if(err) {
+        throw err;
+    }
+});

@@ -1,0 +1,43 @@
+#! /usr/bin/env node
+
+'use-strict';
+
+var rootdir     = process.env.SCENE_STUDIO_ROOT;
+
+var dbdir       = rootdir + '/components/database';
+
+var dbwrite     = require(dbdir + '/dbwrite');
+var queries     = require(dbdir + '/queries');
+var dbwrapper   = require(dbdir + '/dbwrapper')();
+    dbwrapper.mixin(dbwrite).mixin(queries);
+
+var async       = require('async');
+
+
+// get the user name from the command line arguments
+if(process.argv.length <= 2) {
+    console.log('USAGE: ');
+    console.log(" >  ./tools/db/newUser 'user_name' ");
+    process.exit(0);
+}
+var username = process.argv[2];
+
+// now issue the database command and inform the user
+// of the success or failure of the command
+var db = dbwrapper.db();
+async.waterfall([
+async.apply(db.newUser.bind(db), username),
+function(new_user_id, callback) {
+    console.log('created new user with id: ' + new_user_id);
+    callback(null);
+},
+], function(err) {
+    db.close();
+    if(err) {
+        // this can easily happen if we ask to create the same
+        // user over again.
+        console.log("ERROR: could not create new user");
+        console.log(err.message);
+        //throw err;
+    }
+});
