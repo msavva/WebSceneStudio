@@ -1,0 +1,99 @@
+#! /usr/bin/env node
+
+'use-strict';
+
+var rootdir     = process.env.SCENE_STUDIO_ROOT;
+
+var dbdir       = rootdir + '/components/database';
+
+var dbwrite     = require(dbdir + '/dbwrite');
+var queries     = require(dbdir + '/queries');
+var dbwrapper   = require(dbdir + '/dbwrapper')();
+    dbwrapper.mixin(dbwrite).mixin(queries);
+
+var async       = require('async');
+var fs          = require('fs');
+
+var datadir     = rootdir + '/public/data';
+var geom_dir    = datadir + '/geometry';
+var image_dir   = datadir + '/image';
+var meta_dir    = datadir + '/metadata';
+var model_dir   = datadir + '/model';
+var texture_dir = datadir + '/texture';
+
+
+// intro and prompt...
+var msg =
+"Welcome to Database Initialization!\n" +
+"  This script will populate the database with references\n" +
+"    to all of the model files currently stored in\n"
+"    the data directory.\n" +
+"  A user must be supplied who will be assigned ownership of\n" +
+"    of all of these existing models.\n" +
+"WARNING: This script should only be executed on an empty database!\n" +
+"\n";
+console.log(msg);
+
+process.stdin.resume();
+process.stdin.setEncoding('utf8');
+
+console.log("Are you sure that the database is empty? (Y/N)");
+process.stdin.on('data', function(text) {
+process.stdin.pause(); // done listening
+if(text[0] != 'y' && text[0] != 'Y') return;
+console.log();
+// now we're done with the prompt
+
+// get the user name from the command line arguments
+if(process.argv.length <= 2) {
+    console.log('USAGE: ');
+    console.log(" >  ./tools/db/initDataUpload 'owner_user' ");
+    process.exit(0);
+}
+var username = process.argv[2];
+
+// look up the user
+var db = dbwrapper.db();
+db.verbose = false;
+async.waterfall([
+async.apply(db.getUser.bind(db), username),
+function(row, continueWaterfall) {
+    if(!row) {
+        console.log("Could not find user named: " + username);
+        console.log("ABORTING!");
+        process.exit(0);
+    }
+    var user_id = row.id;
+    
+    var geom_list       = fs.readdirSync(geom_dir);
+    var image_list      = fs.readdirSync(image_dir);
+    var meta_list       = fs.readdirSync(meta_dir);
+    var model_list      = fs.readdirSync(model_dir);
+    var texture_list    = fs.readdirSync(texture_dir);
+    
+    // right now we take the naive strategy and just
+    // pack in all of the model files and texture files we find
+    async.parallel([
+    async.apply(async.forEach, model_list, function(filename, callback) {
+        db.newModel(filename, user_id, callback);
+    }),
+    async.apply(async.forEach, texture_list, function(filename, callback) {
+        db.newTexture(filename, user_id, callback);
+    }),
+    ], function(err) {
+        if(err) { continueWaterfall(err); return; }
+        console.log('inserted ' + model_list.length +
+                    ' models into the database');
+        console.log('inserted ' + texture_list.length +
+                    ' textures into the database');
+        continueWaterfall(null);
+    });
+},
+], function(err) {
+    db.close();
+    if(err) throw err;
+}); // end async waterfall block
+
+}); // end initial prompt block
+
+

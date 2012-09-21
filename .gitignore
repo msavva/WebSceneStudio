@@ -13,3 +13,7 @@ node_modules/.bin/
 .bin
 
 /tools/numMatsHist.csv
+
+options.json
+components/database/migrations/.migrate
+

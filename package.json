@@ -9,6 +9,8 @@
     "express": "3.0.0rc3",
     "jade": "*",
     "stylus": "*",
-    "mysql-native": "*"
+    "mysql-native": "*",
+    "migrate": "*",
+    "async": "*"
   }
 }

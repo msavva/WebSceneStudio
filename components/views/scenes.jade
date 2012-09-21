@@ -5,10 +5,10 @@ block content
     h1= title
     h3 Scene List
     #scene_list
-        -for (var id in scenes)
-            -var scene = scenes[id]
-            form(method='get', action='/scenes/#{scene.name}/edit')
-                | #{scene.name} 
+        -for (var i=0; i<scenes.length; i++)
+            -var scene = scenes[i]
+            form(method='get', action='/scenes/#{scene.scene_name}/edit')
+                | #{scene.scene_name} 
                 button edit
     button#new_scene New Scene
 

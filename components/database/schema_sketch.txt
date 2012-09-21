@@ -1,0 +1,63 @@
+
+
+SCHEMA description
+  -- this is only documentation and may differ substantially from the
+     version of the database currently in memory.  Please launch a DB
+     console to inspect the current schema manually for authoritative
+     answer.
+
+all #s are unsigned ints
+
+USER
+    id              #
+    name            varchar(50)     UNIQUE  (user-invented for scenestudio)
+    date_created    datetime        (IMMUTABLE)
+    deleted         Boolean         DEFAULT 0
+    ...
+
+MODEL
+    id              #
+    name            tinytext?       NON-UNIQUE? NULLABLE?
+    filename        tinytext        (UNIQUE disk location)
+    owner           #(USER)         (IMMUTABLE)
+    date_created    datetime        (IMMUTABLE)
+    deleted         Boolean         DEFAULT 0
+    private         Boolean         DEFAULT 0
+    (metadata reflected in DB?)
+    ...
+
+TEXTURE
+    id              #
+    filename        tinytext        (UNIQUE disk location)
+    owner           #(USER)         (IMMUTABLE)
+    date_created    datetime        (IMMUTABLE)
+    deleted         Boolean         DEFAULT 0
+    private         Boolean         DEFAULT 0
+    ...
+
+SCENE_VERSION
+    id              #
+    parent_version  #(SCENE_VERSION)    NULLABLE (IMMUTABLE)
+    date_created    datetime        (IMMUTABLE)
+    scene_writer    #(SCENE)        (IMMUTABLE)
+        // the scene-writer is the scene that wrote this version
+    json            mediumtext      (IMMUTABLE)
+    ui_log          mediumtext      (IMMUTABLE)
+    ...
+
+SCENE
+    id              #
+    name            varchar(80)     (UNIQUE in pair with owner column)
+    owner           #(USER)         (IMMUTABLE)
+    curr_version    #(SCENE_VERSION) (UNIQUE?)
+    forked_from     #(SCENE)        NULLABLE
+    deleted         Boolean         DEFAULT 0
+    private         Boolean         DEFAULT 0
+    ...
+
+
+
+varchar(50) length visualized
+01234567890123456789012345678901234567890123456789
+
+
