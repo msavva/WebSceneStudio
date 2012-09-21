@@ -5,7 +5,7 @@ import sys;
 
 migrate_cmd = "./node_modules/migrate/bin/migrate";
 options = ['-c', 'components/database'];
-command = [migrate_cmd] + options + sys.argv[1:len(sys.argv)];
+command = ["node"] + [migrate_cmd] + options + sys.argv[1:len(sys.argv)];
 
 #print(command);
 
