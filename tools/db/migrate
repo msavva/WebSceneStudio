@@ -2,9 +2,11 @@
 
 from subprocess import call;
 import sys;
+import os;
 
-migrate_cmd = "./node_modules/migrate/bin/migrate";
-options = ['-c', 'components/database'];
+rootdir = os.environ['SCENE_STUDIO_ROOT']
+migrate_cmd = "node";
+options = ["{0}/node_modules/migrate/bin/migrate".format(rootdir), '-c', 'components/database'];
 command = [migrate_cmd] + options + sys.argv[1:len(sys.argv)];
 
 #print(command);

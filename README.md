@@ -66,7 +66,7 @@ Development
 
 ###Database
 
-See [`components/migrations/README.md`](components/migrations) for 
+See [`components/database/README.md`](WebSceneStudio/tree/master/components/database) for 
  information on how to use the database code, how to make changes to
 the schema, and why the schema is set up the way it is.
 

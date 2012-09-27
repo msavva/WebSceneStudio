@@ -130,14 +130,25 @@ body
     top: 8px;
 }
 
+#searchBoxWrapper
+{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 34px;
+    margin: 10px;
+    margin-right: 26px;
+}
+
 #searchInputBox
 {
     font-size: 12pt;
     position: absolute;
-    top: 34px;
-    left: 0;
-    right: 0;
-    margin: 10px;
+/*    top: 34px;*/
+/*    left: 0;
+    right: 0;*/
+    width: 100%;
+/*    margin: 10px;*/
     padding: 6px;
     border: thin solid #A5A5A5;
     -moz-border-radius: 8px;
@@ -156,7 +167,7 @@ body
 #searchButton
 {
     position: absolute;
-    top: 82px;
+    top: 90px;
     right: 0px;
     margin-right: 12px;
 }
