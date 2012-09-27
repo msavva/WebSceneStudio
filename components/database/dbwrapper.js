@@ -135,11 +135,11 @@ DBPrototype.transactionSequence = function(waterfall, callback)
                     console.err('rollback FAILED.  Oh shit!');
                 }
                 callback(err);
-            });
+            }.bind(this));
         } else {
             callback(null);
         }
-    });
+    }.bind(this));
 }
 
 

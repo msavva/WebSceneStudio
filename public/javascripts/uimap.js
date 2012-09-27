@@ -1,10 +1,11 @@
 'use strict';
 
 define([
+	'BrowserDetect',
 	'jquery',
-	'base'
+	'base',
 ],
-function(){
+function(BrowserDetect){
 
 // This Module uses ideas from madrobby's keymaster script,
 // which was made available under the MIT License.
@@ -70,7 +71,7 @@ var button_status = { 0: false, 1: false, 2: false };
 function button_proto() {
     return { 0: false, 1: false, 2: false };
 };
-var mod_status = { 16: false, 17: false, 18: false, 91: false };
+//var mod_status = { 16: false, 17: false, 18: false, 91: false };
 function mod_proto() {
     return { 16: false, 17: false, 18: false, 91: false };
 };
@@ -78,12 +79,24 @@ function mod_proto() {
 // END MODULE VARIABLES
 
 
-function modMatch(mods) {
+/*function modMatch(mods) {
     for (var key in mod_status) {
         if(mod_status[key] !== mods[key])
             return false;
     }
     return true;
+}*/
+
+function modMatch(mods, event) {
+    /*if(BrowserDetect.OS == "Mac" &&
+       BrowserDetect.browser == "Firefox")
+    {
+        event.ctrlKey = false; // suppress control key on Mac/Firefox
+    }*/
+    return (mods[MOD_MAP['alt']] == event.altKey) &&
+           (mods[MOD_MAP['ctrl']] == event.ctrlKey) &&
+           (mods[MOD_MAP['shift']] == event.shiftKey) &&
+           (mods[MOD_MAP['cmd']] == event.metaKey);
 }
 
 function buttonMatch(buttons) {
@@ -104,10 +117,10 @@ function arrayRemove(array, item) {
 }
 
 function setModifiersFromEvent(event) {
-    if(event.shiftKey === undefined)    return;
+/*    if(event.shiftKey === undefined)    return;
     mod_status[MOD_MAP.shift] = event.shiftKey;
     mod_status[MOD_MAP.ctrl] = event.ctrlKey;
-    mod_status[MOD_MAP.alt] = event.altKey;
+    mod_status[MOD_MAP.alt] = event.altKey;*/
 }
 
 
@@ -188,7 +201,7 @@ function installHandlers()
         prevY = event.clientY;
     });
     
-    $(document).keydown(function(event) {
+    /*$(document).keydown(function(event) {
         var key = event.keyCode;
         if (key == 93 || key == 224) key = 91; // cross-browser mac command
         if(key in mod_status)
@@ -204,10 +217,10 @@ function installHandlers()
             mod_status[key] = false;
         else {
         }
-    });
+    });*/
     
     // loss of focus must be detected on window, not document
-    $(window).blur(function(event) {
+    /*$(window).blur(function(event) {
         for(var button=0; button<3; button++) {
             var up_event = $.Event("mouseup");
             up_event.button = button;
@@ -221,7 +234,7 @@ function installHandlers()
         // here to ensure it works right
         // CLEARING modifier state is safer
         mod_status = mod_proto();
-    });
+    });*/
     
     
     // these don't appear necessary
@@ -239,6 +252,7 @@ function installHandlers()
         //console.log('keydown in canvas: ' + event.which);
     });
     $(canvas).keyup(function(event) {
+        console.log('key up: ' + event.which);
         dispatchEvent(keyup_handlers, event);
         ui_key_update_callbacks.forEach(function(callback) {
             callback();
@@ -249,10 +263,11 @@ function installHandlers()
 
 
 /*
-format for a criterion chunk:
+format for a criterion chunk returned:
 [ {button: b_id, mods: [ mod_id1, ... ]}, ... ]
 */
 
+// Stole this processing mostly from madrobby/keymaster.js
 function commonProcessCriterion(criterion, processLastToken, last_token_name) {
     var criteria = criterion.replace(/\s/g,'').split(',');
     var N = criteria.length;
@@ -283,17 +298,57 @@ function commonProcessCriterion(criterion, processLastToken, last_token_name) {
     return result;
 }
 
-// Stole this processing mostly from madrobby/keymaster.js
+// platform independence wrapping for keys and mice
+function localizeModifiers(chunk)
+{
+    var hasCtrl = chunk.mods[MOD_MAP['ctrl']];
+    var hasCmd  = chunk.mods[MOD_MAP['cmd']];
+    
+    if(hasCtrl && hasCmd) {
+        console.log("UIMap Error: Platform Independency Conflict!");
+        console.log("Cannot specify both control and command modifier keys.");
+        console.log("Collapsing both into a single modifier.");
+    }
+    if(hasCtrl || hasCmd) {
+        if(BrowserDetect.OS == "Mac") {
+            chunk.mods[MOD_MAP['ctrl']] = false;
+            chunk.mods[MOD_MAP['cmd']]  = true;
+        } else {
+            chunk.mods[MOD_MAP['ctrl']] = true;
+            chunk.mods[MOD_MAP['cmd']]  = false;
+        }
+    }
+}
+
+function localizeMouse(chunk)
+{
+    // handle right mouse button fiasco on mac
+    if(BrowserDetect.OS == "Mac") {
+        if(chunk.button == BUTTON_MAP["middle"]) {
+            console.log("UIMap Error: Platform Independency Conflict!");
+            console.log("No Middle click available on Mac");
+        } else if (chunk.button == BUTTON_MAP["right"]) {
+            chunk.mods[MOD_MAP['ctrl']] = true;
+            if(BrowserDetect.browser != "Firefox")
+                chunk.button = BUTTON_MAP["left"];
+        }
+    }
+}
+
+
 function processMouseCriterion(criterion) {
-    return commonProcessCriterion(criterion, function(last_token) {
+    var chunks = commonProcessCriterion(criterion, function(last_token) {
         var button = BUTTON_MAP[last_token];
         if(button === undefined) button = invalid;
         return button;
     }, 'button');
+    chunks.forEach(localizeModifiers);
+    chunks.forEach(localizeMouse); // must come second
+    return chunks;
 }
 
 function processKeyCriterion(criterion) {
-    return commonProcessCriterion(criterion, function(last_token) {
+    var chunks = commonProcessCriterion(criterion, function(last_token) {
         var key = KEY_MAP[last_token];
         if(key === undefined) {
             if(last_token.length > 1)
@@ -303,6 +358,8 @@ function processKeyCriterion(criterion) {
         }
         return key;
     }, 'key');
+    chunks.forEach(localizeModifiers);
+    return chunks;
 }
 
 
@@ -311,7 +368,7 @@ function mousepress(criterion, handler) {
     processMouseCriterion(criterion).forEach(function(chunk) {
         mousedown_handlers.push(function(event) {
             if(chunk.button === event.button &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                     var opts = { x: event.clientX, y: event.clientY };
                     handler(opts);
             }
@@ -338,7 +395,7 @@ function mousedrag(criterion, handlers) {
         // the drag is designed to install and then remove the move and finish
         function down_handler(event) {
             if(chunk.button === event.button &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                 var opts = { x: event.clientX, y: event.clientY,
                              /* MORE STUFF? */ };
                 var result = handlers.start(opts);
@@ -386,7 +443,7 @@ function mousehover(criterion, handler) {
     processMouseCriterion(criterion).forEach(function(chunk) {
         mousemove_handlers.push(function(event) {
             if(check_buttons(chunk.button) &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                     var opts = { x: event.clientX, y: event.clientY,
                                  dx: diffX, dy: diffY, };
                     handler(opts);
@@ -400,11 +457,13 @@ function keypress(criterion, handler) {
         var isDown = false;
         keydown_handlers.push(function(event) {
             if(chunk.key === event.which &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
+                console.log("fire: " + event.which);
                 if(!isDown) { // prevent multiple firing
                     var opts = {x: prevX, y: prevY};
                     handler(opts);
                     isDown = true;
+                    console.log("isDown=true:  " + event.which);
                 }
 				event.preventDefault();
             }
@@ -412,6 +471,7 @@ function keypress(criterion, handler) {
         keyup_handlers.push(function(event) {
             if(chunk.key === event.which /* no mod match neccessary */) {
                 isDown = false;
+                    console.log("isDown=false: " + event.which);
 				event.preventDefault();
             }
         });
@@ -432,7 +492,7 @@ function keyhold(criterion, handlers) {
         var isDown = false;
         keydown_handlers.push(function(event) {
             if(chunk.key === event.which &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                 // allow multiple firing, but inform the client
                 var opts = {x: prevX, y: prevY, first_press: !isDown};
                 handlers.hold(opts);
@@ -486,7 +546,7 @@ function mouseattach_tillclick(criterion, handlers) {
         // the drag is designed to install and then remove the move and finish
         function down_handler(event) {
             if(chunk.button === event.button &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                 isPressed = true;
             }
         };
@@ -558,7 +618,7 @@ function mouseattach_tillkey(criterion, handlers) {
         // the drag is designed to install and then remove the move and finish
         function down_handler(event) {
             if(chunk.key === event.which &&
-               modMatch(chunk.mods)) {
+               modMatch(chunk.mods, event)) {
                 isPressed = true;
 				event.preventDefault();
             }

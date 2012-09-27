@@ -161,7 +161,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             } .bind(this),
             finish: function (data) { }
         };
-        this.uimap.mousedrag('right, ctrl+left', orbiting_behavior);
+        this.uimap.mousedrag('right', orbiting_behavior);
 
         // dollying
         var dollying_behavior = {
@@ -174,7 +174,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             } .bind(this),
             finish: function (data) { }
         };
-        this.uimap.mousedrag('middle, ctrl+right, ctrl+shift+left',
+        this.uimap.mousedrag('middle, shift+right',
                              dollying_behavior);
 
         // interactions with 3d objects in the scene (instances, manipulators)
@@ -318,18 +318,18 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         }));
         
         // Copy/Paste
-        this.uimap.keypress('ctrl+C', function() {
+        this.uimap.keypress('C', function() {
             this.Copy();
         }.bind(this));
-        this.uimap.keypress('ctrl+V', function(opts) {
+        this.uimap.keypress('V', function(opts) {
             this.Paste(opts);
         }.bind(this));
         // Undo/Redo
-        this.uimap.keypress('ctrl+Z', function() {
+        this.uimap.keypress('Z', function() {
             this.CancelModelInsertion();
             this.Undo();
         }.bind(this));
-        this.uimap.keypress('ctrl+Y', function() {
+        this.uimap.keypress('Y', function() {
             this.CancelModelInsertion();
             this.Redo();
         }.bind(this));

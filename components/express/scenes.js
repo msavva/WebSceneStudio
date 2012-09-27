@@ -107,8 +107,9 @@ exports.newScene = function(req, res) {
     }, function(err) {
         db.close();
         if(err) {
-            console.log(err);
+            console.dir(err);
             // TODO send a proper error response?
+            //res.send(500, 'Failed to Create New Scene');
             res.redirect('/scenes');
         } else {
             res.redirect('/scenes/' + scene_name + '/edit');
@@ -152,7 +153,7 @@ exports.saveScene = function(req, res) {
     }, function(err) {
         if(err) {
             console.log(err);
-            res.send(); // TODO send a proper failure message
+            res.send(500);
         } else {
             res.send();
         }
