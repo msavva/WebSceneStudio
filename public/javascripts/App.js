@@ -333,6 +333,10 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             this.CancelModelInsertion();
             this.Redo();
         }.bind(this));
+        // Save
+        this.uimap.keypress('S', function() {
+            this.SaveScene();
+        }.bind(this));
         
         // Delete object, Escape selection
         this.uimap.keypress('delete, backspace', function() {

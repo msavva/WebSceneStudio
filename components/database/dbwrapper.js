@@ -271,7 +271,7 @@ DBPrototype.insertRow = function(tablename, row, callback) {
     }
     
     if(col_names.length <= 0) {
-        callback('row has to contain something');
+        callback(new Error('row has to contain something'));
         return;
     }
     
@@ -286,6 +286,59 @@ DBPrototype.insertRow = function(tablename, row, callback) {
         command += '?';
     }
     command += ' )';
+    
+    this.execute(command, values, function(err, res) {
+        if(err)     callback(err, null)
+        else        callback(null, res.insert_id);
+    });
+}
+
+// takes an array of rows instead, all with same columns
+DBPrototype.insertRows = function(tablename, rows, callback) {
+    if(rows.length == 0) {
+        callback(new Error('tried to insert zero rows.  What gives?'));
+        return;
+    }
+    
+    // retreive canonical column names
+    var col_names = [];
+    for(var columnname in rows[0])
+        col_names.push(columnname);
+    if(col_names.length <= 0) {
+        callback(new Error('row has to contain something'));
+        return;
+    }
+    
+    var command = 'INSERT INTO ' + tablename + ' ( ';
+    for(var i=0; i<col_names.length; i++) {
+        if(i!=0) command += ', ';
+        command += col_names[i];
+    }
+    command += ' )';
+    
+    command += ' VALUES ';
+    var values = [];
+    for(var i=0; i<rows.length; i++) {
+        var row = rows[i];
+        if(i!=0) command += ', ';
+        
+        command += '( ';
+        var j = 0;
+        for(var col in row) {
+            if(j!=0) command += ', ';
+            if(col != col_names[j]) {
+                callback(new Error('may have inconsistent column names'+
+                                   ' on different rows to be inserted.'));
+                return;
+            }
+            
+            values.push(row[col]);
+            command += '?';
+            
+            j += 1;
+        }
+        command += ' )';
+    }
     
     this.execute(command, values, function(err, res) {
         if(err)     callback(err, null)

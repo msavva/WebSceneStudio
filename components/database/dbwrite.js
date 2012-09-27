@@ -34,6 +34,15 @@ exports.newModel = function(filename, owner_id, callback)
     callback);
 }
 
+// see above warning
+exports.newModels = function(filenames, owner_id, callback)
+{
+    var records = filenames.map(function(filename) {
+        return { filename: filename, owner: owner_id };
+    });
+    this.insertRows('MODEL', records, callback);
+}
+
 // passes the new texture's id # onto the continuation
 // WARNING: this function does not ensure the validity of
 //          either the filename or the provided user id # foreign key
@@ -44,6 +53,15 @@ exports.newTexture = function(filename, owner_id, callback)
         owner: owner_id,
     },
     callback);
+}
+
+// see above warning
+exports.newTextures = function(filenames, owner_id, callback)
+{
+    var records = filenames.map(function(filename) {
+        return { filename: filename, owner: owner_id };
+    });
+    this.insertRows('TEXTURE', records, callback);
 }
 
 exports.newScene = function(

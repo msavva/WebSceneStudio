@@ -74,12 +74,8 @@ function(row, continueWaterfall) {
     // right now we take the naive strategy and just
     // pack in all of the model files and texture files we find
     async.parallel([
-    async.apply(async.forEach, model_list, function(filename, callback) {
-        db.newModel(filename, user_id, callback);
-    }),
-    async.apply(async.forEach, texture_list, function(filename, callback) {
-        db.newTexture(filename, user_id, callback);
-    }),
+    async.apply(db.newModels.bind(db), model_list, user_id),
+    async.apply(db.newTextures.bind(db), texture_list, user_id),
     ], function(err) {
         if(err) { continueWaterfall(err); return; }
         console.log('inserted ' + model_list.length +
