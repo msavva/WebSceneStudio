@@ -322,12 +322,13 @@ function localizeModifiers(chunk)
 
 function localizeMouse(chunk)
 {
+    if(chunk.button == BUTTON_MAP["middle"]) {
+        console.log("UIMap Error: Platform Independency Conflict!");
+        console.log("No Middle click available on Mac");
+    }
     // handle right mouse button fiasco on mac
     if(BrowserDetect.OS == "Mac") {
-        if(chunk.button == BUTTON_MAP["middle"]) {
-            console.log("UIMap Error: Platform Independency Conflict!");
-            console.log("No Middle click available on Mac");
-        } else if (chunk.button == BUTTON_MAP["right"]) {
+        if (chunk.button == BUTTON_MAP["right"]) {
             chunk.mods[MOD_MAP['ctrl']] = true;
             if(BrowserDetect.browser != "Firefox")
                 chunk.button = BUTTON_MAP["left"];

@@ -319,23 +319,23 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         }));
         
         // Copy/Paste
-        this.uimap.keypress('C', function() {
+        this.uimap.keypress('C, ctrl+C', function() {
             this.Copy();
         }.bind(this));
-        this.uimap.keypress('V', function(opts) {
+        this.uimap.keypress('V, ctrl+V', function(opts) {
             this.Paste(opts);
         }.bind(this));
         // Undo/Redo
-        this.uimap.keypress('Z', function() {
+        this.uimap.keypress('Z, ctrl+Z', function() {
             this.CancelModelInsertion();
             this.Undo();
         }.bind(this));
-        this.uimap.keypress('Y', function() {
+        this.uimap.keypress('Y, ctrl+Y', function() {
             this.CancelModelInsertion();
             this.Redo();
         }.bind(this));
         // Save
-        this.uimap.keypress('S', function() {
+        this.uimap.keypress('S, ctrl+S', function() {
             this.SaveScene();
         }.bind(this));
         
@@ -465,7 +465,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 	
 	App.prototype.LoadScene = function(scene_name, on_failure, on_success)
 	{
-        $.get('/scenes/' + this.scene_name + '/load')
+        $.get('/scenes/' + this.user_name + '/' + this.scene_name + '/load')
         .error(function() {
             on_failure();
         }.bind(this)).success(function(scene_json) {
