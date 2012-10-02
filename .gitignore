@@ -17,3 +17,5 @@ node_modules/.bin/
 options.json
 components/database/migrations/.migrate
 
+# for mac
+.DS_Store

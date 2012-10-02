@@ -7,7 +7,8 @@ block content
     #scene_list
         -for (var i=0; i<scenes.length; i++)
             -var scene = scenes[i]
-            form(method='get', action='/scenes/#{scene.scene_name}/edit')
+            form(method='get',
+                 action='/scenes/#{username}/#{scene.scene_name}/edit')
                 | #{scene.scene_name} 
                 button edit
     button#new_scene New Scene

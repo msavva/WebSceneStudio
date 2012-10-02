@@ -58,6 +58,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         
         // the following variables from globalViewData
         // should be rendered by the jade template
+        this.user_name  = window.globalViewData.user_name;
         this.scene_name = window.globalViewData.scene_name;
         this.close_url  = window.globalViewData.close_url;
         
@@ -486,7 +487,11 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         var serialized = this.scene.SerializeForNetwork();
         $.ajax({
             type: 'POST',
-            url: '/scenes/' + this.scene_name + '/save',
+            url: '/scenes/' +
+                 this.user_name +
+                 '/' +
+                 this.scene_name +
+                 '/save',
             data: {
                 scene_file: JSON.stringify(serialized),
             },

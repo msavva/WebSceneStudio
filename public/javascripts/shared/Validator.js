@@ -1,11 +1,29 @@
 // Check if we are being loaded server-side in which case exports should be defined, else stuff definition into global scope
-var ns = typeof exports == 'undefined' ? (function() {
-    return window['Validator'] = {};
-})() : exports;
 
-ns.alphaNumPlus  = function(string) { return /^[a-z0-9\-_\s]+$/i.test(string); };
+(function(ns){
+// ******************* BEGIN MODULE SCOPE **********************
 
-delete ns; // remove ns from the global scope
+// regular expression fragments
+ns.fragGeneric = "[a-zA-Z0-9\-_\s%]+";
+ns.regexGeneric = new RegExp('^' + ns.fragGeneric + '$');
+
+ns.alphaNumPlus  = function(string) {
+    return ns.regexGeneric.test(string);
+};
+
+ns.fragSceneName = ns.fragGeneric;
+ns.sceneName = ns.alphaNumPlus;
+
+ns.fragUserName = ns.fragGeneric;
+ns.userName  = ns.alphaNumPlus;
+
+// ******************** END MODULE SCOPE ***********************
+})( // choose what to bind to ns,
+    // depending on whether we are server or client side
+    (typeof exports == 'undefined') ?
+        (function() { return window['Validator'] = {}; })()
+      : exports
+);
 
 // Client-side jQuery.validator code
 if (typeof $ != 'undefined') {
