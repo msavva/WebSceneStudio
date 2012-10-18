@@ -38,7 +38,7 @@ function Toolbar(app)
 	this.AddButton('Tumble', 'Tumble selected model (M)',
 	               'tumble', function(event) {
 		app.Tumble(this.app.uistate.selectedInstance, true);
-	});
+	}.bind(this));
 	
 	this.AddSpacer();
 	

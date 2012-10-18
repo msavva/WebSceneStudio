@@ -20,50 +20,38 @@ function SearchController(app)
 	
 	// Search button
 	this.button.button();
-	this.button.click(
-	function()
-	{
+	this.button.click(function() {
 		this.DoSearch(this.textbox[0].value);
 	}.bind(this));
 	
 	// Make enter key execute a button click whenever
 	// the text box has focus.
-	this.textbox.focus(
-	function()
-	{
-		this.textbox.keyup(
-			function (event)
-			{
-				event.stopPropagation();	// Prevent keystrokes from bubbling up to the rest of the UI
-				if (event.keyCode == 13) this.button.click();
-			}.bind(this));
+	this.textbox.focus(function() {
+		this.textbox.keyup(function (event) {
+            // Prevent keystrokes from bubbling up to the rest of the UI
+            event.stopPropagation();	
+            if (event.keyCode == 13) this.button.click();
+        }.bind(this));
 	}.bind(this));
 	
 	// Enter key should not execute a search if text box
 	// doesn't have focus.
-	this.textbox.blur(
-	function()
-	{
+	this.textbox.blur(function() {
 		//this.textbox.unbind('keyup');
-		this.textbox.keyup(
-			function (event)
-			{
-				event.stopPropagation();	// Prevent keystrokes from bubbling up to the rest of the UI
-			});
+		this.textbox.keyup( function (event) {
+            // Prevent keystrokes from bubbling up to the rest of the UI
+            event.stopPropagation();
+        });
 	}.bind(this));
 	
-	this.textbox.keydown(
-		function(event)
-		{
-			event.stopPropagation();
-		}
-	);
+	this.textbox.keydown(function(event) {
+        event.stopPropagation();
+    });
 	
-	this.textbox.keyup(
-		function (event)
-		{
-			event.stopPropagation();	// Prevent keystrokes from bubbling up to the rest of the UI
-		});
+	this.textbox.keyup(function(event) {
+		// Prevent keystrokes from bubbling up to the rest of the UI
+        event.stopPropagation();
+    });
 }
 
 // I originally had this function be anonymous. Then I realized that (assuming no smart
@@ -71,6 +59,7 @@ function SearchController(app)
 // times (one for each search result). So now it's named.
 function NoDrag(event)
 {
+    console.log('nodrag');
 	event.preventDefault();
 }
 
@@ -80,11 +69,16 @@ SearchController.prototype.CreateSearchResult = function(result)
 	var elem = $('<div></div>')
 				.attr('id', result.id)
 				.addClass('searchResultContainer')
-				.append($('<span>' + result.name + '</span>').attr('title', result.name))
-				.append($('<img src="' + Constants.imageDir + result.id + '.jpg"></img>')
-						.bind('dragstart', NoDrag));
+				.append($('<span>' + result.name + '</span>')
+                    .attr('title', result.name))
+				.append($('<img src="' +
+				          Constants.imageDir + result.id +
+				          '.jpg"></img>')
+				.bind('dragstart', NoDrag));
 				
-	elem.click(function() { this.ResultSelected(elem.attr('id')); }.bind(this));
+	elem.click(function() {
+	   this.ResultSelected(elem.attr('id'));
+}.bind(this));
 	
 	return elem;
 }
@@ -107,8 +101,9 @@ SearchController.prototype.ResultSelected = function(mid)
 	
 	resultElem.siblings().removeClass('selected');
 	resultElem.addClass('selected');
-	this.app.BeginModelInsertion(resultElem.attr('id'),
-						 function() { this.ModelRetrieved(resultElem.attr('id')); }.bind(this));
+	this.app.BeginModelInsertion(resultElem.attr('id'), function() {
+	   this.ModelRetrieved(resultElem.attr('id'));
+    }.bind(this));
 }
 
 SearchController.prototype.ModelRetrieved = function(mid)
@@ -192,6 +187,7 @@ SearchController.prototype.SearchFailed = function(jqXHR, textStatus, errorThrow
 SearchController.prototype.PopulateWithResults = function(resultList)
 {
 	// First, remove all current search results.
+	// also deselect anything currently selected...
 	this.results.empty();
 	
 	// If there were no search results, notify the user of this

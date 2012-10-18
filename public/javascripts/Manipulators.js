@@ -6,11 +6,13 @@ define([
 	'Material',
 	'Model',
 	'UndoStack',
+	'fsm',
+	'uibehaviors',
 	'gl-matrix',
 	'gl-matrix-ext',
 	'jquery'
 ],
-function(Constants, Mesh, Material, Model, UndoStack){
+function(Constants, Mesh, Material, Model, UndoStack, FSM, Behaviors){
 
 ////  Manipulator base class ////
 
@@ -18,8 +20,6 @@ function(Constants, Mesh, Material, Model, UndoStack){
 function Manipulator()
 {
 	this.model = null;
-	
-	this.state = Manipulator.states.normal;
 	
 	// Transform stuff
 	this.transform = mat4.identity(mat4.create());
@@ -30,18 +30,63 @@ function Manipulator()
 	this.tooltipText = 'tooltip';
 	this.tooltipTimer = null;
 	this.tooltip = null;
+	
+	this.CreateFocusListener()
+        .onhover(this.Hover.bind(this))
+        .ondefocus(this.KillTooltip.bind(this))
+        .onstart(this.KillTooltip.bind(this))
+        ;
 }
 
-Manipulator.states = {
-	normal: 0,
-	highlighted: 1,
-	active: 2
+
+function drawRefreshShim(fsm, params, next) {
+	params.app.renderer.postRedisplay();
+	next(fsm, params);
 }
 
-Manipulator.prototype.UpdateState = function(newState)
+// extension of mouse dragging behavior
+var manipulator_template = FSM.template()
+    .output('start', 'drag', 'finish', 'cancel',
+            'focus', 'defocus', 'hover')
+    .state('normal')
+        .step('focus', 'focused', 'focus')
+            .shim('focus', drawRefreshShim)
+    .state('focused')
+        .step('defocus', 'normal', 'defocus')
+            .shim('defocus', drawRefreshShim)
+        .step('mousemove', 'focused', 'hover')
+        .step('mousedown', function(fsm, params) {
+            params.lockFocus();
+            params.cancel = function() {
+                    fsm.jump('focused');
+                    params.unlockFocus();
+                };
+            fsm.jump('locked', 'start', params);
+        })
+        .shim(['defocus', 'mousemove', 'mousedown'], drawRefreshShim)
+    .state('locked')
+        .step('mousemove', 'locked', 'drag')
+        .step('mouseup', function(fsm, params) {
+            fsm.jump('focused', 'finish', params);
+            // Unlock must come last; it may trigger a defocus...
+            params.unlockFocus();
+        })
+        // never need to unlock on defocus
+        .step('defocus', 'normal', ['cancel', 'defocus'])
+        .shim(['defocus', 'mousemove', 'mouseup'], drawRefreshShim)
+    ;
+
+Manipulator.prototype.CreateFocusListener = function()
 {
-	this.state = newState;
-}
+    this.focus_listener = Behaviors.createFilter('left','')
+        .output('mousedown', 'mouseup', 'mousemove',
+                'focus', 'defocus'); // ensure filter passes along (de)focus
+    this.fsm = manipulator_template.compile().listen(this.focus_listener);
+    this.fsm.getState = function() { return fsm.curr_state; };
+    
+    return this.fsm;
+};
+
 
 Manipulator.prototype.Attach = function(mInst)
 {
@@ -125,46 +170,17 @@ Manipulator.prototype.KillTooltip = function(data)
 	this.tooltip = null;
 }
 
-Manipulator.prototype.GainFocus = function(data)
-{
-	this.UpdateState(Manipulator.states.highlighted);
-	return true;
-}
-
 Manipulator.prototype.Hover = function(data)
 {
 	// If we don't already have a tooltip active, start the timer for one
 	if (!this.tooltip)
 	{
 		this.KillTooltip(data);
-		this.tooltipTimer = setTimeout(function(){ this.SpawnTooltip(data); }.bind(this), Constants.toolTipDelay);
+		this.tooltipTimer = setTimeout(
+            this.SpawnTooltip.partial(data).bind(this),
+            Constants.toolTipDelay
+        );
 	}
-	return false;
-}
-
-Manipulator.prototype.LoseFocus = function(data)
-{
-	this.KillTooltip(data);
-	this.UpdateState(Manipulator.states.normal);
-	return true;
-}
-
-Manipulator.prototype.BeginMouseInteract = function(data)
-{
-	this.KillTooltip(data);
-	return false;
-}
-
-Manipulator.prototype.ContinueMouseInteract = function(data)
-{
-	this.UpdateState(Manipulator.states.active);
-	return false;
-}
-
-Manipulator.prototype.EndMouseInteract = function(data)
-{
-	this.UpdateState(Manipulator.states.highlighted);
-	return true;
 }
 
 // This is useful for lots of manipulator interactions
@@ -187,10 +203,12 @@ function RotationManipulator(gl)
 	this.gl = gl;
 	
 	// Colors and materials
-	this.mainColors = [Constants.rotateNormalColor, Constants.rotateHighlightColor, Constants.rotateActiveColor];
-	this.notchColors = [Constants.rotateNotchNormalColor, Constants.rotateNotchHighlightColor, Constants.rotateNotchActiveColor];
-	this.mainMaterial = new Material.ManipulatorMaterial(gl, {color: Constants.rotateNormalColor});
-	this.notchMaterial = new Material.ManipulatorMaterial(gl, {color: Constants.rotateNotchNormalColor});
+	this.mainMaterial =
+	   new Material.ManipulatorMaterial(gl,
+	                   {color: Constants.rotateNormalColor});
+	this.notchMaterial =
+	   new Material.ManipulatorMaterial(gl,
+	                   {color: Constants.rotateNotchNormalColor});
 	
 	// Manipulation state
 	this.prevVector = vec3.create();
@@ -198,10 +216,41 @@ function RotationManipulator(gl)
 	
 	// Tooltip
 	this.tooltipText = 'Rotate (Left/Right arrow keys)';
+	
+	// Focus Listener
+	this.ConfigureFocusListener();
 }
 
 // EXTEND: inherit Manipulator prototype
 RotationManipulator.prototype = Object.create(Manipulator.prototype);
+
+
+RotationManipulator.prototype.ConfigureFocusListener = function()
+{
+    this.fsm
+        .onstate_normal(function() {
+          this.mainMaterial.UpdateColor(Constants.rotateNormalColor);
+          this.notchMaterial.UpdateColor(Constants.rotateNotchNormalColor);
+        }.bind(this))
+        .onstate_focused(function() {
+          this.mainMaterial.UpdateColor(Constants.rotateHighlightColor);
+          this.notchMaterial.UpdateColor(Constants.rotateNotchHighlightColor);
+        }.bind(this))
+        .onstate_locked(function() {
+          this.mainMaterial.UpdateColor(Constants.rotateActiveColor);
+          this.notchMaterial.UpdateColor(Constants.rotateNotchActiveColor);
+        }.bind(this))
+        
+        .onstart(function(data) {
+            this.KillTooltip(data);
+            this.BeginMouseInteract(data);
+        }.bind(this))
+        .ondrag(this.ContinueMouseInteract.bind(this))
+        .onfinish(this.EndMouseInteract.bind(this))
+        .oncancel(this.EndMouseInteract.bind(this))
+        ;
+}
+
 
 RotationManipulator.prototype.RegenGeometry = function(newRi)
 {
@@ -230,14 +279,6 @@ RotationManipulator.prototype.RegenGeometry = function(newRi)
 	this.model = new Model("RotationManipulator", components);
 }
 
-RotationManipulator.prototype.UpdateState = function(newState)
-{
-	Manipulator.prototype.UpdateState.call(this, newState);
-	
-	this.mainMaterial.UpdateColor(this.mainColors[this.state]);
-	this.notchMaterial.UpdateColor(this.notchColors[this.state]);
-}
-
 RotationManipulator.prototype.Attach = function(mInst)
 {
 	Manipulator.prototype.Attach.call(this, mInst);
@@ -263,21 +304,15 @@ RotationManipulator.prototype.Detach = function()
 
 RotationManipulator.prototype.BeginMouseInteract = function(data)
 {
-	Manipulator.prototype.BeginMouseInteract.call(this, data);
-	
 	var isect = this.PickPlane(data);
 	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.prevVector);
 	
 	this.actualAbsoluteAng = this.ownerInstance.rotation;
 	this.snappedAbsoluteAng = this.ownerInstance.rotation;
-	
-	return true;
 }
 
 RotationManipulator.prototype.ContinueMouseInteract = function(data)
 {
-	Manipulator.prototype.ContinueMouseInteract.apply(this, data);
-	
 	var cf = this.ownerInstance.coordFrame;
 	
 	var isect = this.PickPlane(data);
@@ -289,16 +324,12 @@ RotationManipulator.prototype.ContinueMouseInteract = function(data)
 	this.ownerInstance.CascadingRotate(ang);
 	
 	vec3.set(this.currVector, this.prevVector);
-	
-	return true;
 }
 
 RotationManipulator.prototype.EndMouseInteract = function(data)
 {
-	if (this.state === Manipulator.states.active)
-		data.app.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE, this.ownerInstance);
-	Manipulator.prototype.EndMouseInteract.call(this, data);
-	return true;
+    data.app.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE,
+                                        this.ownerInstance);
 }
 
 RotationManipulator.prototype.SnapAbsoluteAng = function()
@@ -338,7 +369,6 @@ function ScaleManipulator(gl)
 	this.gl = gl;
 	
 	// Colors and materials
-	this.colors = [Constants.scaleNormalColor, Constants.scaleHighlightColor, Constants.scaleActiveColor];
 	this.material = new Material.ManipulatorMaterial(gl, {color: Constants.scaleNormalColor});
 	
 	// Manipulation state
@@ -347,10 +377,38 @@ function ScaleManipulator(gl)
 	
 	// Tooltip
 	this.tooltipText = 'Scale (Up/Down arrow keys)';
+	
+	// Focus Listener
+	this.ConfigureFocusListener();
 }
 
 // EXTEND: inherit Manipulator prototype
 ScaleManipulator.prototype = Object.create(Manipulator.prototype);
+
+
+ScaleManipulator.prototype.ConfigureFocusListener = function()
+{
+    this.fsm
+        .onstate_normal(function() {
+            this.material.UpdateColor(Constants.scaleNormalColor);
+        }.bind(this))
+        .onstate_focused(function() {
+            this.material.UpdateColor(Constants.scaleHighlightColor);
+        }.bind(this))
+        .onstate_locked(function() {
+            this.material.UpdateColor(Constants.scaleActiveColor);
+        }.bind(this))
+        
+        .onstart(function(data) {
+            this.KillTooltip(data);
+            this.BeginMouseInteract(data);
+        }.bind(this))
+        .ondrag(this.ContinueMouseInteract.bind(this))
+        .onfinish(this.EndMouseInteract.bind(this))
+        .oncancel(this.EndMouseInteract.bind(this))
+        ;
+}
+
 
 ScaleManipulator.prototype.RegenGeometry = function(newR)
 {
@@ -373,13 +431,6 @@ ScaleManipulator.prototype.RegenGeometry = function(newR)
 	
 	// Finalize the model
 	this.model = new Model("ScaleManipulator", components);
-}
-
-ScaleManipulator.prototype.UpdateState = function(newState)
-{
-	Manipulator.prototype.UpdateState.call(this, newState);
-	
-	this.material.UpdateColor(this.colors[this.state]);
 }
 
 ScaleManipulator.prototype.Attach = function(mInst)
@@ -407,18 +458,12 @@ ScaleManipulator.prototype.Detach = function()
 
 ScaleManipulator.prototype.BeginMouseInteract = function(data)
 {
-	Manipulator.prototype.BeginMouseInteract.call(this, data);
-	
 	var isect = this.PickPlane(data);
 	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.prevVector);
-	
-	return true;
 }
 
 ScaleManipulator.prototype.ContinueMouseInteract = function(data)
 {
-	Manipulator.prototype.ContinueMouseInteract.apply(this, data);
-	
 	var isect = this.PickPlane(data);
 	vec3.subtract(isect.position, this.ownerInstance.parentPos, this.currVector);
 	
@@ -426,15 +471,12 @@ ScaleManipulator.prototype.ContinueMouseInteract = function(data)
 	this.ownerInstance.CascadingScale(ldiff * Constants.scaleMagnitudeMultiplier);
 
 	vec3.set(this.currVector, this.prevVector);
-	return true;
 }
 
 ScaleManipulator.prototype.EndMouseInteract = function(data)
 {
-	if (this.state === Manipulator.states.active)
-		data.app.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE, this.ownerInstance);
-	Manipulator.prototype.EndMouseInteract.call(this, data);
-	return true;
+    data.app.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE,
+                                        this.ownerInstance);
 }
 
 

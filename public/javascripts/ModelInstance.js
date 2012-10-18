@@ -5,10 +5,12 @@ define([
 	'PubSub',
 	'UndoStack',
 	'CoordinateFrame',
+	'fsm',
+	'uibehaviors',
 	'gl-matrix',
 	'gl-matrix-ext'
 ],
-function(Constants, PubSub, UndoStack, CoordinateFrame){
+function(Constants, PubSub, UndoStack, CoordinateFrame, FSM, Behaviors){
 
 function ModelInstance(model, parentInst)
 {
@@ -43,6 +45,8 @@ function ModelInstance(model, parentInst)
 		isSelected: false,
 		isSelectable: true
 	};
+	
+	this.CreateFocusListener();
 }
 
 // EXTEND PUBSUB: Inherit PubSub prototype
@@ -491,25 +495,54 @@ ModelInstance.prototype.EvaluateSurface = function(meshI, triI, uv)
 
 
 
+// extension of mouse dragging behavior
+var interaction_template = FSM.template()
+    .output('start', 'drag', 'finish', 'cancel',
+            'focus', 'defocus', 'hover')
+    .state('up')
+        .repeat('focus', 'defocus')
+        .step('mousemove', 'up', 'hover')
+        .step('mousedown', function(fsm, params) {
+            params.lockFocus();
+            params.cancel = function() {
+                    fsm.jump('up');
+                    params.unlockFocus();
+                };
+            fsm.jump('down', 'start', params);
+        })
+    .state('down')
+        .step('mousemove', 'down', 'drag')
+        .step('mouseup', function(fsm, params) {
+            fsm.jump('up', 'finish', params);
+            params.unlockFocus(); // NEEDS to come last here
+        })
+        .step('defocus', function(fsm, params) {
+            // no need to release if we've already been told to defocus
+            fsm.jump('up');
+            fsm.emit('cancel', params);
+            fsm.emit('defocus', params);
+        })
+    ;
 
-ModelInstance.prototype.GainFocus = function(data)
+ModelInstance.prototype.CreateFocusListener = function()
 {
-	return false;
+    this.focus_listener = Behaviors.createFilter('left','')
+        .output('mousedown', 'mouseup', 'mousemove',
+                'focus', 'defocus'); // ensure filter passes along events
+    var fsm = interaction_template.compile().listen(this.focus_listener)
+        .onstart(this.BeginMouseInteract.bind(this))
+        .ondrag(this.ContinueMouseInteract.bind(this))
+        .onfinish(this.EndMouseInteract.bind(this))
+        .oncancel(this.EndMouseInteract.bind(this)) // yeah, this is safe
+        ;
 };
 
-ModelInstance.prototype.Hover = function(data)
-{
-	return false;
-};
-
-ModelInstance.prototype.LoseFocus = function(data)
-{
-	return false;
-};
 
 ModelInstance.prototype.BeginMouseInteract = function(data)
 {
 	var app = data.app;
+	
+	app.renderer.postRedisplay();
 	
 	// If this is a selectable instance, then proceed.
 	// Else, kill the entire interaction right now.
@@ -518,7 +551,8 @@ ModelInstance.prototype.BeginMouseInteract = function(data)
 	else
 	{
 		app.SelectInstance(null);
-		return false;
+		data.cancel();
+		return;
 	}
 
 	// Project the base centroid of the selected model instance
@@ -538,13 +572,13 @@ ModelInstance.prototype.BeginMouseInteract = function(data)
 
 	// Hide the cursor while moves are happening
 	$('#ui').addClass('hideCursor');
-	
-	return true;
 };
 
 ModelInstance.prototype.ContinueMouseInteract = function(data)
 {
 	var app = data.app;
+	
+	app.renderer.postRedisplay();
 	
 	// Make the model unpickable, so drag moves don't pick it.
 	app.ToggleSuppressPickingOnSelectedInstance(true);
@@ -564,15 +598,15 @@ ModelInstance.prototype.ContinueMouseInteract = function(data)
 	}
 	
 	this.Publish('Moving');
-	
-	return true;
 };
 
 ModelInstance.prototype.EndMouseInteract = function(data)
 {
 	var app = data.app;
 	
-	// Make this mode pickable again.
+	app.renderer.postRedisplay();
+	
+	// Make this model pickable again.
 	app.ToggleSuppressPickingOnSelectedInstance(false);
 
 	// Show the cursor again
@@ -586,8 +620,6 @@ ModelInstance.prototype.EndMouseInteract = function(data)
 	delete this.moveState;
 		
 	this.Publish('StoppedMoving');
-		
-	return true;
 };
 
 

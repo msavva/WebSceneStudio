@@ -16,10 +16,12 @@ define([
 	'PubSub',
 	'SplitView',
 	'uimap',
+	'uibehaviors',
+	'fsm',
 	'jquery'
 ],
 function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, SearchController,
-		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, CameraControls, PubSub, SplitView, uimap)
+		  ArchitectureGenerator, Manipulators, UndoStack, Toolbar, CameraControls, PubSub, SplitView, uimap, Behaviors, FSM)
 {
     // support function should be factored out...?
     function mapTable(table, perField) {
@@ -31,15 +33,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 
     function UIState(gl)
     {
-        // Keeping track of which object will be manipulated during
-        // mouse interactions. This is the object that is under the mouse
-        // cursor--or, if an interaction is in progress, this is the object
-        // that has focus for that interaction.
-        this.focusedObject = null;
-
-        // Model insertion
-        this.insertInstance = null;
-
         // Model selection
         this.selectedInstance = null;
 
@@ -109,7 +102,7 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 				this.camera.UpdateSceneBounds(this.scene.Bounds());
                 this.undoStack.clear();
                 this.renderer.postRedisplay();
-            } .bind(this));
+            }.bind(this));
         }.bind(this),
         function() { // on success finish up some setup
 			this.camera.SaveStateForReset();
@@ -125,12 +118,9 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
     
     App.prototype.UpdateView = function ()
     {
-        // While the view is changing, no object in the scene should have focus
-        this.uistate.focusedObject && this.uistate.focusedObject.LoseFocus();
-        this.uistate.focusedObject = null;
-
         this.renderer.view_ = this.camera.LookAtMatrix();
-        mat4.multiply(this.renderer.proj_, this.renderer.view_, this.renderer.viewProj_);
+        mat4.multiply(this.renderer.proj_, this.renderer.view_,
+                      this.renderer.viewProj_);
         this.renderer.postRedisplay();
     };
     
@@ -142,99 +132,59 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         }
         
         /*** Behaviors are specified here ***/
-
-        // Keeping track of what object is under the mouse cursor
-        // while the mouse is idly moving across the screen.
-        this.uimap.mousehover('none', function (data)
-        {
-            if (!this.uistate.insertInstance)
-                this.UpdateFocusedObject(data);
-        } .bind(this));
-
+        
         // orbiting rotation
-        var orbiting_behavior = {
-            start: function (data) { },
-            drag: function (data)
-            {
+        var orbiting_behavior =
+            Behaviors.mousedrag(this.uimap, 'right')
+            .ondrag(function(data) {
                 this.camera.OrbitLeft(-data.dx * Constants.cameraOrbitSpeed);
                 this.camera.OrbitUp(data.dy * Constants.cameraOrbitSpeed);
                 this.UpdateView();
-            } .bind(this),
-            finish: function (data) { }
-        };
-        this.uimap.mousedrag('right', orbiting_behavior);
+            }.bind(this));
 
         // dollying
-        var dollying_behavior = {
-            start: function (data) { },
-            drag: function (data)
-            {
+        var dollying_behavior =
+            Behaviors.mousedrag(this.uimap, 'middle, shift+right')
+            .ondrag(function(data) {
                 this.camera.DollyLeft(data.dx * Constants.cameraDollySpeed);
                 this.camera.DollyUp(data.dy * Constants.cameraDollySpeed);
                 this.UpdateView();
-            } .bind(this),
-            finish: function (data) { }
-        };
-        this.uimap.mousedrag('middle, shift+right',
-                             dollying_behavior);
-
-        // interactions with 3d objects in the scene (instances, manipulators)
-        var interacting_behavior = {
-            start: function (data)
-            {
-                // prevent other interaction while inserting
-                if (this.uistate.insertInstance)
-                    return false;
-				
-                // Now do stuff.
-                this.renderer.postRedisplay();
-                this.UpdateFocusedObject(data);
-                if (!this.uistate.focusedObject)
-                {
-                    this.SelectInstance(null);
-                    return false;
-                }
-                data.app = this;
-                return this.uistate.focusedObject.BeginMouseInteract(data);
-            } .bind(this),
-            drag: function (data)
-            {
-                data.app = this;
-                if (this.uistate.focusedObject.ContinueMouseInteract(data))
-                    this.renderer.postRedisplay();
-            } .bind(this),
-            finish: function (data)
-            {
-                data.app = this;
-                if (this.uistate.focusedObject.EndMouseInteract(data))
-                    this.renderer.postRedisplay();
-                this.UpdateFocusedObject(data);
-            } .bind(this)
-        };
-        this.uimap.mousedrag('left', interacting_behavior);
-
-        // model insertion IDEALLY THIS WOULD BE A SINGLE REGISTERED BEHAVIOR
-        this.uimap.mousepress('left', function ()
-        {
-            if (this.uistate.insertInstance)
-            {
-                this.FinishModelInsertion();
-            }
-        } .bind(this));
-        this.uimap.mousehover('none', function (data)
-        {
-            if (this.uistate.insertInstance)
+            }.bind(this));
+        
+        // no need to install handlers, as events are
+        // dynamically routed by the machine
+        var focus = this.focusMachine = this.CreateFocusMachine();
+        // inhibit focusing during view manipulations
+        orbiting_behavior
+            .onstart(focus.start_interruption.bind(focus))
+            .onfinish(focus.finish_interruption.bind(focus));
+        dollying_behavior
+            .onstart(focus.start_interruption.bind(focus))
+            .onfinish(focus.finish_interruption.bind(focus));
+        
+        // also make sure insertion inhibits focusing
+        this.insertion_behavior = this.CreateInsertionBehavior()
+            .onstart(focus.start_interruption.bind(focus))
+            .onfinish(function(data) {
+                this.FinishModelInsertion(data.instance);
+                focus.finish_interruption();
+            }.bind(this))
+            .onhover(function(data) {
                 this.ContinueModelInsertion(data.x, data.y);
-        } .bind(this));
-
+            }.bind(this))
+            .oncancel(function(data) {
+                this.CancelModelInsertion(data.instance)
+                focus.finish_interruption();
+            }.bind(this));
+        
 		// mouse wheel scrolls
         addWheelHandler(this.canvas, this.MouseWheel.bind(this));
         
         // some support functions
         var ensureInstance = function(toWrap) {
             var helper = function(opts) {
-                if(this.uistate.insertInstance) {
-                    opts.instance = this.uistate.insertInstance;
+                if(this.insertion_behavior.isActive()) {
+                    opts.instance = this.insertion_behavior.instance();
                 } else if(this.uistate.selectedInstance) {
                     opts.instance = this.uistate.selectedInstance;
                     opts.saveUndo = true;
@@ -261,125 +211,314 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         // Keyboard Rotate/Scale
         var rotateIncrement = Constants.keyboardRotationIncrementUnmodified;
         var scaleIncrement  = Constants.keyboardScaleFactorUnmodified;
-        var rotate_left_behavior = ensureInstance({
-            hold: function(opts) {
+        var rotate_left_behavior = 
+            Behaviors.keyhold(this.uimap, 'left')
+            .onhold(ensureInstance(function(opts) {
                 opts.instance.CascadingRotate(rotateIncrement);
-            },
-            finish: function(opts) {
+                this.renderer.postRedisplay();
+            }.bind(this)))
+            .onfinish(ensureInstance(function(opts) {
                 if(opts.saveUndo) 
                     this.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE,
                                                     opts.instance);
-            }.bind(this)
-        });
-        this.uimap.keyhold('left', rotate_left_behavior);
-        var rotate_right_behavior = ensureInstance({
-            hold: function(opts) {
+            }.bind(this)));
+        
+        var rotate_right_behavior = 
+            Behaviors.keyhold(this.uimap, 'right')
+            .onhold(ensureInstance(function(opts) {
                 opts.instance.CascadingRotate(-rotateIncrement);
-            },
-            finish: function(opts) {
+                this.renderer.postRedisplay();
+            }.bind(this)))
+            .onfinish(ensureInstance(function(opts) {
                 if(opts.saveUndo) 
                     this.undoStack.pushCurrentState(UndoStack.CMDTYPE.ROTATE,
                                                     opts.instance);
-            }.bind(this)
-        });
-        this.uimap.keyhold('right', rotate_right_behavior);
-        var scale_up_behavior = ensureInstance({
-            hold: function(opts) {
+            }.bind(this)));
+        
+        var scale_up_behavior =
+            Behaviors.keyhold(this.uimap, 'up')
+            .onhold(ensureInstance(function(opts) {
                 opts.instance.CascadingScale(scaleIncrement);
-            },
-            finish: function(opts) {
+                this.renderer.postRedisplay();
+            }.bind(this)))
+            .onfinish(ensureInstance(function(opts) {
                 if(opts.saveUndo) 
                     this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE,
                                                     opts.instance);
-            }.bind(this)
-        });
-        this.uimap.keyhold('up', scale_up_behavior);
-        var scale_down_behavior = ensureInstance({
-            hold: function(opts) {
+            }.bind(this)));
+        
+        var scale_down_behavior =
+            Behaviors.keyhold(this.uimap, 'down')
+            .onhold(ensureInstance(function(opts) {
                 opts.instance.CascadingScale(1.0 / scaleIncrement);
-            },
-            finish: function(opts) {
+                this.renderer.postRedisplay();
+            }.bind(this)))
+            .onfinish(ensureInstance(function(opts) {
                 if(opts.saveUndo) 
                     this.undoStack.pushCurrentState(UndoStack.CMDTYPE.SCALE,
                                                     opts.instance);
-            }.bind(this)
-        });
-        this.uimap.keyhold('down', scale_down_behavior);
+            }.bind(this)));
         
         // Keyboard Tumble
-        this.uimap.keyhold('M', ensureInstance({
-            hold: function(opts) {
+        Behaviors.keyhold(this.uimap, 'M')
+            .onhold(ensureInstance(function(opts) {
                 this.Tumble(opts.instance, false);
-            }.bind(this),
-            finish: function(opts) {
+                this.renderer.postRedisplay();
+            }.bind(this)))
+            .onfinish(ensureInstance(function(opts) {
                 if(opts.saveUndo) 
                     this.undoStack.pushCurrentState(
                         UndoStack.CMDTYPE.SWITCHFACE, opts.instance);
-            }.bind(this)
-        }));
+            }.bind(this)));
         
         // Copy/Paste
-        this.uimap.keypress('C, ctrl+C', function() {
-            this.Copy();
-        }.bind(this));
-        this.uimap.keypress('V, ctrl+V', function(opts) {
-            this.Paste(opts);
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'C, ctrl+C')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.Copy();
+                this.renderer.postRedisplay();
+            }.bind(this));
+        Behaviors.keypress(this.uimap, 'V, ctrl+V')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.Paste(data);
+                this.renderer.postRedisplay();
+            }.bind(this));
+        
         // Undo/Redo
-        this.uimap.keypress('Z, ctrl+Z', function() {
-            this.CancelModelInsertion();
-            this.Undo();
-        }.bind(this));
-        this.uimap.keypress('Y, ctrl+Y', function() {
-            this.CancelModelInsertion();
-            this.Redo();
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'Z, ctrl+Z')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.insertion_behavior.cancel();
+                this.Undo();
+                this.renderer.postRedisplay();
+            }.bind(this));
+        Behaviors.keypress(this.uimap, 'Y, ctrl+Y')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.insertion_behavior.cancel();
+                this.Redo();
+                this.renderer.postRedisplay();
+            }.bind(this));
+        
         // Save
-        this.uimap.keypress('S, ctrl+S', function() {
-            this.SaveScene();
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'S, ctrl+S')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.SaveScene();
+            }.bind(this));
         
         // Delete object, Escape selection
-        this.uimap.keypress('delete, backspace', function() {
-            this.Delete();
-        }.bind(this));
-        this.uimap.keypress('escape', function() {
-            this.CancelModelInsertion();
-            this.SelectInstance(null);
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'delete, backspace')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.Delete();
+                this.renderer.postRedisplay();
+            }.bind(this));
+        Behaviors.keypress(this.uimap, 'escape')
+            .onpress(function(data) {
+                data.preventDefault();
+                this.insertion_behavior.cancel();
+                this.SelectInstance(null);
+                this.renderer.postRedisplay();
+            }.bind(this));
         
         // open dialog
-        this.uimap.keypress('Q', function() {
-            this.architectureGenerator.openDialog();
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'Q')
+            .onpress(function(data) {
+                this.architectureGenerator.openDialog();
+            }.bind(this));
         
         // debug which instance is currently being manipulated
-        this.uimap.keypress('X', ensureInstance(function(opts) {
-            console.log(opts.instance.model.id);
-        }));
-        
-        
-        // ensure the scene re-renders on all key events
-        this.uimap.allkeyupdates(function() {
-            this.renderer.postRedisplay();
-        }.bind(this));
+        Behaviors.keypress(this.uimap, 'X')
+            .onpress(ensureInstance(function(opts) {
+                console.log(opts.instance.model.id);
+            }));
     };
     
-    App.prototype.UpdateFocusedObject = function (data)
+    // HOW TO MAKE AN OBJECT FOCUSABLE:
+    //  (1) The object must be pickable
+    //  (2) The object must supply a 'focus_listener' member object
+    //  (3) This object must have an FSM-like listen/dispatch interface
+    //          to which events will be routed during focus
+    //  (4) Events which will be dispatched:
+    //          mousedown, mouseup, mousemove,
+    //          keydown, keyup
+    //          focus, defocus
+    // The focus machine built here is responsible for centralizing
+    // and managing the concept of application focus.
+    App.prototype.CreateFocusMachine = function()
     {
-        var oldobj = this.uistate.focusedObject;
-        var newobj = this.renderer.picker.PickObject(data.x, data.y, this.renderer);
-        var needsRedisplay = false;
-        if (newobj !== oldobj)
-        {
-            needsRedisplay |= (oldobj && oldobj.LoseFocus(data));
-            this.uistate.focusedObject = newobj;
-            needsRedisplay |= (newobj && newobj.GainFocus(data));
+        var app = this;
+        var uimap = app.uimap;
+        
+        // hidden state: which object is currently focused on
+        var focusedObject = null;
+        // hidden state: keep track of mouse position so we can spoof...
+        var prevX = null, prevY = null;
+        function xyShim(fsm, params, next) {
+            prevX = params.x;
+            prevY = params.y;
+            next(fsm, params);
         }
-        newobj && newobj.Hover(data);
-        if (needsRedisplay)
-            this.renderer.postRedisplay();
+        
+        // "semaphore" for keeping track of how many extra
+        // interruptions are occuring right now.
+        var extra_interruptions = 0;
+        
+        function augmentShim(fsm, params, next) {
+            params.lockFocus = fsm.lock.bind(fsm);
+            params.unlockFocus = fsm.unlock.bind(fsm);
+            params.app = app;
+            next(fsm, params);
+        }
+        
+        function focusable(obj) {
+            return obj && obj.focus_listener;
+        }
+        function focusOn(fsm, target) {
+            if(focusable(target)) {
+                focusedObject = target;
+                // hook up the new object
+                target.focus_listener.listen(fsm);
+                // and inform it that it's been focused on
+                fsm.emit('focus', {app: app});
+            }
+        }
+        function defocusShim(fsm, params, next) {
+            if(focusedObject) {
+                fsm.emit('defocus', {app: app});
+                fsm.detach();
+                focusedObject = null;
+            }
+            if(next) next(fsm, params); // guard to allow non-shim use
+        }
+        function updateFocus(fsm, x, y) {
+            var oldobj = focusedObject;
+            var newobj = app.renderer.picker.PickObject(x, y, app.renderer);
+            if (newobj !== oldobj) {
+                defocusShim(fsm);
+                focusOn(fsm, newobj);
+            }
+        }
+        function reset(fsm, params) {
+            fsm.jump('free');
+            updateFocus(fsm, prevX, prevY);
+        }
+        var uimap_signals = ['mousedown', 'mousemove', 'mouseup',
+                             'keydown', 'keyup'];
+        var focus_template = FSM.template()
+            .output(uimap_signals) // spoof uimap to the object...
+            .output('focus', 'defocus') // extra signals
+            .state('free')
+                .step('mousemove', function(fsm, params) {
+                    updateFocus(fsm, params.x, params.y);
+                    fsm.emit('mousemove', params);
+                })
+                .repeat('mousedown', 'mouseup', 'keydown', 'keyup')
+                    .shim('mousemove', xyShim)
+                    .shim(uimap_signals, augmentShim)
+                .step('lock', 'locked')
+                .step('start_interruption', 'interrupted')
+                    .shim('start_interruption', defocusShim)
+            .state('interrupted')
+                // ERROR: need semaphore counter for this state...
+                // ALSO: should have some kind of global UI monitor/reset
+                //          for safety...
+                .step('start_interruption', function(fsm, params) {
+                    extra_interruptions += 1;
+                })
+                .step('finish_interruption', function(fsm, params) {
+                    if(extra_interruptions > 0)
+                        extra_interruptions -= 1;
+                    else
+                        reset(fsm, params);
+                })
+                .step('mousemove', 'interrupted') // jump nowhere
+                    .shim('mousemove', xyShim) // but update xy data
+            .state('locked')
+                .step('start_interruption', 'interrupted')
+                    .shim('start_interruption', defocusShim)
+                .repeat(uimap_signals)
+                    .shim('mousemove', xyShim)
+                    .shim(uimap_signals, augmentShim)
+                // call from focused object to release lock
+                .step('unlock', reset)
+            ;
+        
+        var fsm = focus_template.compile().listen(uimap);
+        
+        // non-writable interface
+        fsm.isFocused = function() { // not whether it's locked...
+            return !!(focusedObject);
+        }
+        fsm.isLocked = function() {
+            return fsm.curr_state == 'locked';
+        }
+        fsm.instance = function() {
+            return focusedObject;
+        }
+        
+        return fsm;
     };
+    
+    // This encapsulates access to the current state/progress
+    // of an insertion, as well as access to the instance being inserted.
+    // one consequence is to ensure that the instance
+    // being inserted is always valid when needed!
+    App.prototype.CreateInsertionBehavior = function()
+    {
+        var app = this;
+        var uimap = app.uimap;
+        
+        // The main course; the locally scoped, protected state;
+        // YES, it's the...
+        var insertInstance = null;
+        
+        function nullShim(fsm, params, next) {
+            if(!params) params = {};
+            params.instance = insertInstance;
+            insertInstance = null;
+            next(fsm, params);
+        }
+        var insertion_template = FSM.template()
+            .output('start', 'hover', 'finish', 'cancel')
+            .state('empty')
+                .step('start', function(fsm, params) {
+                    if(params.instance) {
+                        insertInstance = params.instance;
+                        fsm.jump('up', 'start');
+                    }
+                })
+            .state('up')
+                .step('mousemove', 'up', 'hover')
+                .step('mousedown', 'down')
+                .step('cancel', 'empty', 'cancel')
+                    .shim('cancel', nullShim)
+            .state('down')
+                .step('mousemove', 'down', 'hover')
+                .step('mouseup', 'empty', 'finish')
+                    .shim('mouseup', nullShim)
+                .step('cancel', 'empty', 'cancel')
+                    .shim('cancel', nullShim)
+            ;
+        
+        var insertion_filter =
+            Behaviors.createFilter('left', '')
+                .listen(uimap, ['mousedown', 'mouseup', 'mousemove']);
+        var fsm = insertion_template.compile().listen(insertion_filter);
+        
+        // expose a non-writable interface to insertInstance;
+        // all re-assignment is handled by the state-machine
+        fsm.isActive = function() {
+            return insertInstance !== null;
+        };
+        fsm.instance = function() {
+            return insertInstance;
+        };
+        
+        return fsm;
+    }
     
     App.prototype.ToggleBusy = function (isBusy)
     {
@@ -426,11 +565,13 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
 	{
 		if (this.uistate.copyInstance)
         {
-            this.CancelModelInsertion(); // In case anything else is being inserted.
-
-            this.uistate.insertInstance = this.uistate.copyInstance.Clone();
-
-            var hi = this.uistate.insertInstance;
+            // Cancel any other insertions that are in-progress
+            this.insertion_behavior.cancel();
+            
+            // get a copy and initialize an insertion using it
+            var hi = this.uistate.copyInstance.Clone();
+            this.insertion_behavior.start({instance: hi});
+            
             hi.renderState.isSelected = false;
             hi.renderState.isPickable = false;
             hi.renderState.isInserting = true;
@@ -508,16 +649,25 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         }.bind(this)); // should add dialog to ask if the user wants to leave
         // even though nothing was saved in event of error
     }
-
+    
+    // This exists to permit us to drag objects around
+    // and intersect the surface underneath them (instead of the object itself)
+    // so that we can actually place the object...
     App.prototype.ToggleSuppressPickingOnSelectedInstance = function (toggle)
     {
         if (this.uistate.selectedInstance)
         {
-            var wasPickable = this.uistate.selectedInstance.renderState.isPickable;
-            this.uistate.selectedInstance.renderState.isPickable = !toggle;
+            var wasPickable =
+                this.uistate.selectedInstance.renderState.isPickable;
+            this.uistate.selectedInstance.renderState.isPickable =
+                !toggle;
 
             // If pickability changed ensure picking pass runs now to avoid out of sync pick buffer
-            if (wasPickable !== this.uistate.selectedInstance.renderState.isPickable) this.renderer.pickingDrawPass();
+            if (wasPickable !==
+                this.uistate.selectedInstance.renderState.isPickable)
+            {
+                this.renderer.pickingDrawPass();
+            }
         }
     };
 
@@ -559,35 +709,44 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
     {
         return this.renderer.picker.PickTriangle(x, y, this.camera, this.renderer);
     };
-
+    
+    // This call is only being used by the Search Controller.
+    // It may be very poorly designed for anything else...
     App.prototype.BeginModelInsertion = function (modelid, callback)
     {
         // If there is an existing insert instance (meaning, we were already in
         // model insertion mode), then clear this hoverinstance and release
         // the previous model
-        this.CancelModelInsertion();
+        this.insertion_behavior.cancel();
 
         // Clear the current selection (gets rid of widgets, etc.)
         this.SelectInstance(null);
 
-        // Now, fetch the new model, and when it is ready, set the new insert instance.
-        // Don't forget to call back into the Search widget so that things can be updated
-        // appropriately.
+        // Now, fetch the new model, and when it is ready,
+        // set the new insert instance.
+        // Don't forget to call back into the Search widget
+        // so that things can be updated appropriately there.
         this.assman.GetModel(modelid, function (model)
         {
-            this.uistate.insertInstance = new ModelInstance(model, null);
-            var hi = this.uistate.insertInstance;
+            if(this.insertion_behavior.isActive())  {
+                console.log("ERROR!!!  Race On Model Insertion!");
+                console.log("   Last One in wins!");
+                this.insertion_behavior.cancel();
+            }
+            var hi = new ModelInstance(model, null);
+            this.insertion_behavior.start({instance: hi});
+            
             hi.renderState.isPickable = false;
             hi.renderState.isInserting = true;
             hi.SetReasonableScale(this.scene);
             this.renderer.postRedisplay();
             callback();
-        } .bind(this));
+        }.bind(this));
     };
 
     App.prototype.ContinueModelInsertion = function (x, y)
     {
-        var hi = this.uistate.insertInstance;
+        var hi = this.insertion_behavior.instance();
         var intersect = this.PickTriangle(x, y);
         if (intersect)
         {
@@ -602,27 +761,21 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
         this.renderer.postRedisplay();
     };
 
-    App.prototype.CancelModelInsertion = function ()
+    App.prototype.CancelModelInsertion = function (hi)
     {
-        var hi = this.uistate.insertInstance;
-        if (hi)
-        {
-            this.searchController.ResultDeselected(hi.model.id);
-            this.RemoveModelInstance(hi);
-            this.uistate.insertInstance = null;
-            this.renderer.postRedisplay();
-        }
+        this.searchController.ResultDeselected(hi.model.id);
+        this.RemoveModelInstance(hi);
+        this.renderer.postRedisplay();
     };
 
-    App.prototype.FinishModelInsertion = function ()
+    App.prototype.FinishModelInsertion = function (hi)
     {
-        var hi = this.uistate.insertInstance;
-
-        // If the click happened while the mouse was over empty space (and thus the insert instance
-        // has no parent), treat this the same as canceling the insert.
+        // If the click happened while the mouse was over empty space
+        // (and thus the insert instance has no parent),
+        // treat this the same as canceling the insert.
         if (!hi.parent)
         {
-            this.CancelModelInsertion();
+            this.CancelModelInsertion(hi); // A little clunky.  Oh well!
         }
         else
         // Otherwise, leave the model in the scene and clean up.
@@ -630,7 +783,6 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             this.searchController.ResultDeselected(hi.model.id);
             hi.renderState.isPickable = true;
             hi.renderState.isInserting = false;
-            this.uistate.insertInstance = null;
 
 			this.SelectInstance(hi);
             this.undoStack.pushCurrentState(UndoStack.CMDTYPE.INSERT, hi);
