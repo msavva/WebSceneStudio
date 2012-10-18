@@ -189,6 +189,8 @@ SearchController.prototype.PopulateWithResults = function(resultList)
 	// First, remove all current search results.
 	// also deselect anything currently selected...
 	this.results.empty();
+	// kill any ongoing insertions
+	this.app.insertion_behavior.cancel();
 	
 	// If there were no search results, notify the user of this
 	if (resultList.length == 0)
