@@ -151,6 +151,18 @@ Scene.prototype.Pick = function(renderer)
 		this.manipulators[i].Pick(renderer, nummodels+i);
 };
 
+Scene.prototype.SerializeBare = function()
+{
+	// Just serializes model ids and transforms; enough to render
+	// the scene correctly in a different application
+	var mlist = [];
+	this.modelList.forEach(function(model) {
+		model.UpdateTransform();
+		mlist.push({ modelID: model.modelID, transform: model.transform});
+	})
+	return JSON.stringify(mlist);
+}
+
 Scene.prototype.SerializeForLocal = function()
 {
 	var packedModels = [];
