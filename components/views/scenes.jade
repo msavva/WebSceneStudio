@@ -16,28 +16,8 @@ block content
 block scripts
   script(src='/javascripts/jquery-ui/js/jquery.validate.min.js')
   script(src='/javascripts/shared/Validator.js')
+  script(src='/javascripts/ValidatedDialog.js')
   script
     $(function() {
-
-      $('button').button();
-      $('#new_scene').click(function(){
-        var dialog = $('<div id="new_scene_dialog">\
-          <form method="post" action="/newScene" id="new_scene_form">\
-            Scene Name: <input id="scene_name" type="text" name="scene_name" class="required alphanumPlus">\
-          </form>\
-        </div>');
-
-        dialog.dialog({
-          modal: true,
-          title: "Create New Scene",
-          buttons: [
-            {text: "Cancel", click: function() {$(this).dialog("close")}},
-            {text: "Submit", click: function() {
-                var form = $('#new_scene_form');
-                var validator = form.validate();
-                if (validator.form()) form.submit();
-            }},
-          ],
-        });
-      });
+        $('button').button();
     });

@@ -334,6 +334,12 @@ function (Constants, Camera, Renderer, AssetManager, ModelInstance, Scene, Searc
             .onpress(ensureInstance(function(opts) {
                 console.log(opts.instance.model.id);
             }));
+			
+		// spit out bare JSON data for the scene
+		Behaviors.keypress(this.uimap, 'K')
+		.onpress(function() {
+			console.log(this.scene.SerializeBare());
+		}.bind(this))
     };
     
     // HOW TO MAKE AN OBJECT FOCUSABLE:
